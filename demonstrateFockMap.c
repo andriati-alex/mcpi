@@ -8,14 +8,15 @@ int main(int argc, char * argv[])
     int
         i,
         j,
+        k,
         nc,
         Npar, // number of particles
         Morb; // number of orbitals
 
     Iarray
-        occ,
         NCmat,
-        IFmat;
+        IFmat,
+        Map;
 
     if (argc != 3)
     {
@@ -29,7 +30,7 @@ int main(int argc, char * argv[])
     sscanf(argv[2],"%d",&Morb);
     nc = NC(Npar,Morb);
 
-    if (Npar > 99 || Morb > 99)
+    if (Npar > 99 || Morb > 9)
     {
         printf("\n\nWARNING: Bad output print format.");
         printf(" Number of particles or orbitals too large\n\n");
@@ -37,7 +38,8 @@ int main(int argc, char * argv[])
 
     NCmat = MountNCmat(Npar,Morb);
     IFmat = MountFocks(Npar,Morb);
-    occ = iarrDef(Morb);
+
+    Map = JumpMapping(Npar,Morb,NCmat,IFmat);
 
 
 
@@ -49,22 +51,30 @@ int main(int argc, char * argv[])
 
 
 
-    printf("All configurations :\n");
+    printf("Configuration Number  |  [ occupations ]  |  FockToIndex ");
+    printf(" | Transitions\n");
     for (i = 0; i < nc; i++)
     {
-        printf("\n%8d  [", i);
+        printf("\n%8d      [", i);
 
-        for (j = 0; j < Morb - 1; j++) printf(" %3d |", IFmat[i + nc*j]);
-        printf(" %3d ]", IFmat[i + nc*(Morb-1)]);
+        for (j = 0; j < Morb - 1; j++) printf(" %3d |", IFmat[j + Morb*i]);
+        printf(" %3d ]", IFmat[Morb - 1 + Morb*i]);
 
-        for (j = 0; j < Morb; j++) occ[j] = IFmat[i + nc*j];
+        k = FockToIndex(Npar,Morb,NCmat,&IFmat[Morb*i]);
+        if (k != i)
+        {
+            printf("\n\nERROR: Wrong map from FockToIndex\n\n");
+        }
 
-        printf(" %d", FockToIndex(Npar,Morb,NCmat,occ));
+        printf("      %d", k);
+
+        printf("    %d -> %d", 1, 3);
+        printf(" goes to index %d",Map[i+1*nc+3*nc*Morb]);
     }
 
     free(IFmat);
     free(NCmat);
-    free(occ);
+    free(Map);
 
     printf("\n\n");
     return 0;

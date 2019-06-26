@@ -213,7 +213,10 @@ int FockToIndex(int N, int M, Iarray NCmat, Iarray v)
 Iarray MountFocks(int N, int M)
 {
 
-/** All possible occupation vectors in a matrix **/
+/** All possible occupation vectors in a vector. To get the occupations
+  * respect to configuration index k we  use  ItoFock[j + k*M]  with  j
+  * going from 0 to M - 1 (the orbital number).
+**/
 
     int
         i,
@@ -221,24 +224,76 @@ Iarray MountFocks(int N, int M)
         nc;
 
     Iarray
-        ItoFock,
-        occ;
+        ItoFock;
 
     nc = NC(N,M);
-    occ = iarrDef(M);
     ItoFock = iarrDef(nc * M);
 
     for (k = 0; k < nc; k++)
     {
-        IndexToFock(k, N, M, occ);
-        for (i = 0; i < M; i++)
+        IndexToFock(k, N, M, &ItoFock[M*k]);
+    }
+
+    return ItoFock;
+}
+
+
+
+Iarray JumpMapping(int N, int M, Iarray NCmat, Iarray IF)
+{
+
+/** Given a configuration index, map it in a new one which the
+  * occupation vector differs from the first by a  jump  of  a
+  * particle from one orital to another. Thus given i we have
+  *
+  * Map[i + k * nc + l * nc * M] = index of a configuration which
+  * have one particle less in k that has been added in l.
+**/
+
+    int i,
+        q,
+        k,
+        l,
+        nc;
+
+    Iarray
+        v,
+        Map;
+
+    nc = NC(N,M);
+    
+    v = iarrDef(M);
+
+    Map = iarrDef(M * M * nc);
+
+    for (i = 0; i < nc * M * M; i++) Map[i] = 0;
+
+    for (i = 0; i < nc; i++)
+    {
+        // Copy the occupation vector from C[i] coeff.
+
+        for (q = 0; q < M; q++) v[q] = IF[q + M*i];
+
+        for (k = 0; k < M; k++)
         {
-            ItoFock[k + nc*i] = occ[i];
+            // Take one particle from k state
+            if (v[k] < 1) continue;
+
+            for (l = 0; l < M; l++)
+            {
+                // Put one particle in l state
+                v[k] -= 1;
+                v[l] += 1;
+                Map[i + k * nc + l * M * nc] = FockToIndex(N,M,NCmat,v);
+                v[k] += 1;
+                v[l] -= 1;
+            }
         }
     }
 
-    free(occ);
-    return ItoFock;
+    free(v);
+
+    return Map;
 }
 
 
