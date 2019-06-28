@@ -1,5 +1,5 @@
-#ifndef _confMap_h
-#define _confMap_h
+#ifndef _configurationsMap_h
+#define _configurationsMap_h
 
 #include <complex.h>
 #include <stdlib.h>
@@ -12,6 +12,10 @@ typedef double * Rarray;
 
 // Vector of complex numbers
 typedef double complex * Carray;
+
+
+// Matrix of complex numbers
+typedef double complex ** Cmatrix;
 
 
 // Vector of integer numbers
@@ -63,7 +67,8 @@ Iarray iarrDef(int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\n\tMEMORY ERROR : malloc fail for integer\n\n");
+        printf("\n\n\n\tMEMORY ERROR : malloc fail for integer.");
+        printf(" Size requested : %ld\n\n", n * sizeof(int));
         exit(EXIT_FAILURE);
     }
 
@@ -92,7 +97,7 @@ int NC(int N, int M)
 
 /** Number of Configurations(NC) of N particles in M states **/
 
-    int
+    long
         i,
         n;
 
@@ -101,11 +106,11 @@ int NC(int N, int M)
     if  (M > N)
     {
         for (i = N + M - 1; i > M - 1; i --) n = n * i;
-        return n / fac(N);
+        return (int) (n / fac(N));
     }
 
     for (i = N + M - 1; i > N; i --) n = n * i;
-    return n / fac(M - 1);
+    return (int) (n / fac(M - 1));
 }
 
 
@@ -239,7 +244,7 @@ Iarray MountFocks(int N, int M)
 
 
 
-Iarray JumpMapping(int N, int M, Iarray NCmat, Iarray IF)
+Iarray OneOneMap(int N, int M, Iarray NCmat, Iarray IF)
 {
 
 /** Given a configuration index, map it in a new one which the
@@ -266,7 +271,7 @@ Iarray JumpMapping(int N, int M, Iarray NCmat, Iarray IF)
 
     Map = iarrDef(M * M * nc);
 
-    for (i = 0; i < nc * M * M; i++) Map[i] = 0;
+    for (i = 0; i < nc * M * M; i++) Map[i] = -1;
 
     for (i = 0; i < nc; i++)
     {
@@ -292,6 +297,229 @@ Iarray JumpMapping(int N, int M, Iarray NCmat, Iarray IF)
     }
 
     free(v);
+
+    return Map;
+}
+
+
+
+Iarray allocTwoTwoMap(int nc, int M, Iarray IF)
+{
+    int
+        i,
+        k,
+        s,
+        chunks;
+
+    Iarray
+        Map;
+
+    chunks = 0;
+
+    for (i = 0; i < nc; i++)
+    {
+
+        for (k = 0; k < M; k++)
+        {
+
+            if (IF[k + i * M] < 1) continue;
+
+            for (s = k + 1; s < M; s++)
+            {
+
+                if (IF[s + i * M] < 1) continue;
+
+                chunks++;
+            }
+        }
+    }
+
+    Map = iarrDef(chunks * M * M);
+
+    for (i = 0; i < M * M * chunks; i++) Map[i] = -1;
+
+    return Map;
+}
+
+
+
+Iarray TwoTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
+{
+    int
+        i,
+        k,
+        s,
+        l,
+        q,
+        nc,
+        chunksO,
+        chunksC,
+        strideO,
+        mapIndex;
+
+    Iarray
+        occ,
+        Map;
+
+    nc = NC(N,M);
+    occ = iarrDef(M);
+
+    Map = allocTwoTwoMap(nc,M,IF);
+
+    chunksC = 0;
+
+    for (i = 0; i < nc; i++)
+    {
+        strideC[i] = chunksC * (M * M);
+
+        for (k = 0; k < M; k++) occ[k] = IF[k + M * i];
+
+        chunksO = 0;
+
+        for (k = 0; k < M; k++)
+        {
+
+            if (occ[k] < 1) continue;
+
+            for (s = k + 1; s < M; s++)
+            {
+
+                if (occ[s] < 1) continue;
+
+                strideO = chunksO * M * M;
+
+                for (l = 0; l < M; l++)
+                {
+                    // put one particle in l state
+                    for (q = 0; q < M; q++)
+                    {
+                        // Put one particle in q state
+                        mapIndex = strideC[i] + strideO + (l + q * M);
+                        occ[k] -= 1;
+                        occ[s] -= 1;
+                        occ[l] += 1;
+                        occ[q] += 1;
+                        Map[mapIndex] = FockToIndex(N,M,NCmat,occ);
+                        occ[k] += 1;
+                        occ[s] += 1;
+                        occ[l] -= 1;
+                        occ[q] -= 1;
+                    }
+                }
+
+                chunksO++;
+                chunksC++;
+            }
+        }
+    }
+
+    free(occ);
+
+    return Map;
+}
+
+
+
+Iarray allocOneTwoMap(int nc, int M, Iarray IF)
+{
+
+    int
+        i,
+        k,
+        chunks;
+
+    Iarray
+        Map;
+
+    chunks = 0;
+
+    for (i = 0; i < nc; i++)
+    {
+
+        for (k = 0; k < M; k++)
+        {
+
+            if (IF[k + i * M] < 2) continue;
+
+            chunks++;
+
+        }
+    }
+
+    Map = iarrDef(chunks * M * M);
+
+    for (i = 0; i < M * M * chunks; i++) Map[i] = -1;
+
+    return Map;
+}
+
+
+
+Iarray OneTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
+{
+    
+    int
+        i,
+        q,
+        k,
+        l,
+        nc,
+        chunksO,
+        chunksC,
+        strideO,
+        mapIndex;
+
+    Iarray
+        occ,
+        Map;
+
+    occ = iarrDef(M);
+    nc = NC(N,M);
+
+    Map = allocOneTwoMap(nc,M,IF);
+
+    chunksC = 0;
+
+    for (i = 0; i < nc; i++)
+    {
+
+        strideC[i] = chunksC * M * M;
+
+        // Copy the occupation vector from C[i] coeff.
+        for (k = 0; k < M; k++) occ[k] = IF[k + i * M];
+
+        chunksO = 0;
+
+        for (k = 0; k < M; k++)
+        {
+
+            // Must be able to remove two particles
+            if (occ[k] < 2) continue;
+
+            strideO = chunksO * M * M;
+
+            for (l = 0; l < M; l++)
+            {
+                // put one particle in l state
+                for (q = 0; q < M; q++)
+                {
+                    mapIndex = strideC[i] + strideO + (l + q * M);
+                    // Put one particle in q state
+                    occ[k] -= 2;
+                    occ[l] += 1;
+                    occ[q] += 1;
+                    Map[mapIndex] = FockToIndex(N,M,NCmat,occ);
+                    occ[k] += 2;
+                    occ[l] -= 1;
+                    occ[q] -= 1;
+                }
+            }
+            chunksO++;
+            chunksC++;
+        }
+    }
+
+    free(occ);
 
     return Map;
 }
