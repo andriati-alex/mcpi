@@ -224,7 +224,6 @@ Iarray MountFocks(int N, int M)
 **/
 
     int
-        i,
         k,
         nc;
 
@@ -236,7 +235,7 @@ Iarray MountFocks(int N, int M)
 
     for (k = 0; k < nc; k++)
     {
-        IndexToFock(k, N, M, &ItoFock[M*k]);
+        IndexToFock(k,N,M,&ItoFock[M*k]);
     }
 
     return ItoFock;

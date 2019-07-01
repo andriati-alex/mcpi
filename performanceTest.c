@@ -12,9 +12,7 @@ int main(int argc, char * argv[])
     int
         i,
         j,
-        k,
         q,
-        s,
         l,
         nc,
         Npar,
@@ -43,6 +41,8 @@ int main(int argc, char * argv[])
     Carray
         C,
         out,
+        out_X,
+        out_XX,
         rho2,
         rho2_X,
         rho2_XM,
@@ -99,6 +99,9 @@ int main(int argc, char * argv[])
     printf("\nMemory for two-two Map : %.1lf",
             ((double) strideTT[nc-1]*sizeof(int))/1E6);
 
+    printf("\nMemory for two-body matrix elements : %.1lf",
+            ((double) Morb*Morb*Morb*Morb*sizeof(double complex))/1E6);
+
 
 
     rho1 = (double complex **) malloc(Morb * sizeof(double complex *));
@@ -129,6 +132,8 @@ int main(int argc, char * argv[])
 
     C = carrDef(nc);
     out = carrDef(nc);
+    out_X = carrDef(nc);
+    out_XX = carrDef(nc);
     rho2 = carrDef(Morb * Morb * Morb * Morb);
     rho2_X = carrDef(Morb * Morb * Morb * Morb);
     rho2_XM = carrDef(Morb * Morb * Morb * Morb);
@@ -158,10 +163,6 @@ int main(int argc, char * argv[])
 
 
     for (i = 0; i < Morb*Morb*Morb*Morb; i++) Hint[i] = 1.234;
-
-    printf("\n\nHere ok");
-    printf("\n\nHere ok");
-
 
     for (i = 0; i < Morb; i++)
     {
@@ -250,8 +251,17 @@ int main(int argc, char * argv[])
     start = clock();
     for (i = 0; i < 5; i++)
     {
+        applyHconf_X(Npar,Morb,Map,MapOT,strideOT,NCmat,IFmat,C,Ho,Hint,out_X);
+    }
+    end = clock();
+    time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;
+    printf("\n\nTime to apply H with one-map : %.3lfms", time_used * 1000);
+
+    start = clock();
+    for (i = 0; i < 5; i++)
+    {
         applyHconf_XX(Npar,Morb,Map,MapOT,MapTT,strideOT,strideTT,
-                NCmat,IFmat,C,Ho,Hint,out);
+                NCmat,IFmat,C,Ho,Hint,out_XX);
     }
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;
@@ -264,10 +274,16 @@ int main(int argc, char * argv[])
     carr_txt("rho2_X.dat",Morb*Morb*Morb*Morb,rho2_X);
     carr_txt("rho2_XM.dat",Morb*Morb*Morb*Morb,rho2_XM);
 
+    carr_txt("C.dat",nc,out);
+    carr_txt("C_X.dat",nc,out_X);
+    carr_txt("C_XM.dat",nc,out_XX);
+
 
 
     free(C);
     free(out);
+    free(out_X);
+    free(out_XX);
     free(Map);
 
     for(i = 0; i < Morb; i++) free(rho1[i]);
