@@ -517,6 +517,40 @@ Iarray allocOneTwoMap(int nc, int M, Iarray IF)
 
 
 
+int TwoTwoMapSize(int nc, int M, Iarray IF)
+{
+
+    int
+        i,
+        k,
+        s,
+        chunks;
+
+    chunks = 0;
+
+    for (i = 0; i < nc; i++)
+    {
+
+        for (k = 0; k < M; k++)
+        {
+
+            if (IF[k + i * M] < 1) continue;
+
+            for (s = k + 1; s < M; s++)
+            {
+
+                if (IF[s + i * M] < 1) continue;
+
+                chunks++;
+            }
+        }
+    }
+
+    return chunks * M * M;
+}
+
+
+
 Iarray OneTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
 {
     

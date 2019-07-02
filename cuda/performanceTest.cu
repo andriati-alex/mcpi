@@ -97,7 +97,7 @@ int main(int argc, char * argv[])
     // alloc Maps on device
 
     cu_iarrDef( nc * Morb * Morb , &d_Map );
-    cu_iarrDef( strideOT[nc-1] , &d_MapOT );
+    cu_iarrDef( strideOT[nc-1] + Morb*Morb , &d_MapOT );
     cu_iarrDef( strideTT[nc-1] , &d_MapTT );
 
     // Copy data from host to device
@@ -147,7 +147,7 @@ int main(int argc, char * argv[])
         exit(EXIT_FAILURE);
     }
 
-    nbytes = strideOT[nc-1] * sizeof(int);
+    nbytes = (strideOT[nc-1] + Morb*Morb) * sizeof(int);
     err = cudaMemcpy(d_MapOT,MapOT,nbytes,cudaMemcpyHostToDevice);
     if (err != cudaSuccess)
     {
