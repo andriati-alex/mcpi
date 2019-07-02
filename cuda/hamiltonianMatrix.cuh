@@ -4,14 +4,58 @@
 #include "configurationsMap.cuh"
 
 
+__device__
+void d_fac(int n, long * out)
+{
+    long
+        i,
+        nfac;
+
+    nfac = 1;
+
+    for (i = 1; i < n; i++) nfac = nfac * (i + 1);
+
+    *out = nfac;
+}
+
+
+
+__device__
+void d_NC(int N, int M, int * nc)
+{
+
+/** Number of Configurations(NC) of N particles in M states **/
+
+    long
+        i,
+        n,
+        fact;
+
+    n = 1;
+
+    if  (M > N)
+    {
+        for (i = N + M - 1; i > M - 1; i --) n = n * i;
+        d_fac(N,&fact);
+        *nc = (int) (n / fact);
+    }
+    else
+    {
+        for (i = N + M - 1; i > N; i --) n = n * i;
+        d_fac(M-1,&fact);
+        *nc = (int) (n / fact);
+    }
+}
+
+
+
 __global__
 void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
      Iarray strideOT, Iarray strideTT, Iarray NCmat, Iarray IF, Iarray v,
-     Carray C, Cmatrix Ho, Carray Hint, Carray out)
+     Carray C, Carray Ho, Carray Hint, Carray out)
 {
     // Apply the many-body hamiltonian in a state expressed in
     // number-occupation basis with coefficients defined by C.
-
 
 
     int
@@ -36,9 +80,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         M2,
         M3;
 
-    cudaError_t
-        err;
-
     cuDoubleComplex
         z,
         w,
@@ -48,7 +89,8 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
     cuStride = blockDim.x * gridDim.x;
     init = blockIdx.x * blockDim.x + threadIdx.x;
 
-    nc = NC(N,M);
+
+    d_NC(N,M,&nc);
     M2 = M * M;
     M3 = M * M2;
 
@@ -419,7 +461,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 if (v[s] < 1) continue;
                 for (q = s + 1; q < M; q++)
                 {
-                    sqrtOf = sqrt((double)v[k] * v[s] * (v[q]+1) * (v[q]+2));
 
                     hIndex = k + s * M + q * M2 + q * M3;
 
@@ -540,7 +581,9 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
             }           // Finish s
         }               // Finish k
 
-        out[i] = w + 0.5 * z;
+        aux = cuCmul(z,make_cuDoubleComplex(0.5,0));
+
+        out[i] = cuCadd(w,aux);
     }
 
 }

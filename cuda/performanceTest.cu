@@ -1,4 +1,5 @@
 #include "hamiltonianMatrix.cuh"
+#include "outTextFile.h"
 
 
 
@@ -12,18 +13,25 @@ int main(int argc, char * argv[])
         l,
         nc,
         Npar,
-        Morb;
+        Morb,
+        blocks;
 
     size_t
         nbytes;
 
     double
-        sum;
+        sum,
+        realPart,
+        imagPart;
 
     cudaError_t
         err;
 
+    cuDoubleComplex
+        z;
+
     Iarray
+        d_occ,
         Map,
         d_Map,
         MapOT,
@@ -72,6 +80,7 @@ int main(int argc, char * argv[])
 
     cu_iarrDef( (Npar + 1)*(Morb + 1) , &d_NCmat );
     cu_iarrDef( nc * Morb , &d_IFmat );
+    cu_iarrDef( Morb , &d_occ );
 
     strideTT = iarrDef(nc);
     strideOT = iarrDef(nc);
@@ -165,7 +174,7 @@ int main(int argc, char * argv[])
     printf("MEMORY CONSUMPTION (in Mb)");
 
     printf("\n\nMemory for coefficients : %.1lf",
-            ((double) nc*sizeof(double complex)) / 1E6);
+            ((double) 2*nc*sizeof(double)) / 1E6);
 
     printf("\nMemory for Fock states : %.1lf",
             ((double) nc*Morb*sizeof(int)) / 1E6);
@@ -179,7 +188,7 @@ int main(int argc, char * argv[])
             ((double) strideTT[nc-1]*sizeof(int))/1E6);
 
     printf("\nMemory for two-body matrix elements : %.1lf",
-            ((double) Morb*Morb*Morb*Morb*sizeof(double complex))/1E6);
+            ((double) 2*Morb*Morb*Morb*Morb*sizeof(double))/1E6);
 
 
 
@@ -192,16 +201,16 @@ int main(int argc, char * argv[])
     out = carrDef(nc);
 
     // alloc device arrays
-    cu_carrDef(nc,d_out);
-    cu_carrDef(nc,d_C);
-    cu_carrDef(Morb*Morb,d_Ho);
-    cu_carrDef(Morb*Morb*Morb*Morb,d_Hint);
+    cu_carrDef(nc,&d_out);
+    cu_carrDef(nc,&d_C);
+    cu_carrDef(Morb*Morb,&d_Ho);
+    cu_carrDef(Morb*Morb*Morb*Morb,&d_Hint);
 
     sum = 0.0;
     for (i = 0; i < nc; i++)
     {
         realPart = sin( 20 * ((double) i) / nc) * (i % 13);
-        imagPart = - (i % 8) * I;
+        imagPart = (i % 8) - (i % 3);
         C[i] = make_cuDoubleComplex(realPart,imagPart);
         sum = sum + realPart * realPart + imagPart * imagPart;
     }
@@ -298,7 +307,9 @@ int main(int argc, char * argv[])
     blocks = (nc + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
     applyHconf<<<blocks,THREADS_PER_BLOCK>>>(Npar,Morb,d_Map,d_MapOT,d_MapTT,
-            d_strideOT,d_strideTT,d_NCmat,d_IFmat,d_C,d_Ho,d_Hint,d_out);
+            d_strideOT,d_strideTT,d_NCmat,d_IFmat,d_occ,d_C,d_Ho,d_Hint,d_out);
+
+    cudaDeviceSynchronize();
 
     nbytes = nc * sizeof(cuDoubleComplex);
     err = cudaMemcpy(out,d_out,nbytes,cudaMemcpyDeviceToHost);
@@ -309,7 +320,7 @@ int main(int argc, char * argv[])
         exit(EXIT_FAILURE);
     }
 
-    // carr_txt("C.dat",nc,out);
+    carr_txt("C.dat",nc,out);
 
     // free Host memory
     free(C);
@@ -326,17 +337,18 @@ int main(int argc, char * argv[])
 
     // free device memory
 
-    free(d_C);
-    free(d_out);
-    free(d_Ho);
-    free(d_Hint);
-    free(d_IFmat);
-    free(d_NCmat);
-    free(d_strideOT);
-    free(d_strideTT);
-    free(d_MapOT);
-    free(d_MapTT);
-    free(d_Map);
+    cudaFree(d_C);
+    cudaFree(d_out);
+    cudaFree(d_Ho);
+    cudaFree(d_Hint);
+    cudaFree(d_IFmat);
+    cudaFree(d_NCmat);
+    cudaFree(d_strideOT);
+    cudaFree(d_strideTT);
+    cudaFree(d_MapOT);
+    cudaFree(d_MapTT);
+    cudaFree(d_Map);
+    cudaFree(d_occ);
 
     printf("\n\nDone.\n\n");
     return 0;

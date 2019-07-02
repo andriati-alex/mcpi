@@ -142,7 +142,7 @@ int main(int argc, char * argv[])
     sum = 0.0;
     for (i = 0; i < nc; i++)
     {
-        C[i] = sin( 20 * ((double) i) / nc) * (i % 13) - (i % 8) * I;
+        C[i] = sin(20*((double)i)/nc) * (i%13) + ((i%8)-(i%3)) * I;
         sum = sum + creal(C[i]) * creal(C[i]) + cimag(C[i]) * cimag(C[i]);
     }
 
@@ -156,7 +156,7 @@ int main(int argc, char * argv[])
         Ho[i][i] = (i % 4) - 1;
         for (j = i + 1; j < Morb; j++)
         {
-            Ho[i][j] = i * (j % 3) - (i % 4) + 5 * (j % 2);
+            Ho[i][j] = i*(j%3) - (i%4) + 5*(j%2) - I*(4.123*i/(j + 1));
             Ho[j][i] = conj(Ho[i][j]);
         }
     }

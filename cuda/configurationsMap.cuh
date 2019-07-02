@@ -14,7 +14,7 @@ typedef double * Rarray;
 
 
 // Vector of complex numbers
-typedef cuDoubleComplex Carray;
+typedef cuDoubleComplex * Carray;
 
 
 // Vector of integer numbers
