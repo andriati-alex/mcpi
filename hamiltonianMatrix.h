@@ -868,8 +868,8 @@ void applyHconf_X (int N, int M, Iarray Map, Iarray MapOT, Iarray strideOT,
 
 
 void applyHconf_XX (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
-     Iarray strideOT, Iarray strideTT, Iarray NCmat, Iarray IF,
-     Carray C, Cmatrix Ho, Carray Hint, Carray out)
+     Iarray strideOT, Iarray strideTT, Iarray IF, Carray C, Cmatrix Ho,
+     Carray Hint, Carray out)
 {
     // Apply the many-body hamiltonian in a state expressed in
     // number-occupation basis with coefficients defined by C.
@@ -1137,6 +1137,9 @@ void applyHconf_XX (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
             {
                 for (k = l + 1; k < M; k++)
                 {
+
+                    if (v[k] < 2) continue;
+
                     sqrtOf = sqrt((double)v[k]*(v[k]-1)*(v[q]+1)*(v[l]+1));
 
                     chunks = 0;

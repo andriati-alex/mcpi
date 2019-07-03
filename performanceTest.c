@@ -261,7 +261,7 @@ int main(int argc, char * argv[])
     for (i = 0; i < 5; i++)
     {
         applyHconf_XX(Npar,Morb,Map,MapOT,MapTT,strideOT,strideTT,
-                NCmat,IFmat,C,Ho,Hint,out_XX);
+                IFmat,C,Ho,Hint,out_XX);
     }
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;

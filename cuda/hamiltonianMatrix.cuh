@@ -51,8 +51,8 @@ void d_NC(int N, int M, int * nc)
 
 __global__
 void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
-     Iarray strideOT, Iarray strideTT, Iarray IF, Iarray v,
-     Carray C, Carray Ho, Carray Hint, Carray out)
+     Iarray strideOT, Iarray strideTT, Iarray IF, Carray C, Carray Ho,
+     Carray Hint, Carray out)
 {
     // Apply the many-body hamiltonian in a state expressed in
     // number-occupation basis with coefficients defined by C.
@@ -78,7 +78,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         cuStride,
         init,
         M2,
-        M3;
+        M3,
+        vk,
+        vl,
+        vs,
+        vq;
 
     cuDoubleComplex
         z,
@@ -99,8 +103,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         w = make_cuDoubleComplex(0,0);
         z = make_cuDoubleComplex(0,0);
 
-        for (k = 0; k < M; k++) v[k] = IF[i*M+k];
-
         /* ================================================================ *
          *                                                                  *
          *                       One-body contribution                      *
@@ -109,10 +111,12 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
 
         for (k = 0; k < M; k++)
         {
-            if (v[k] < 1) continue;
+            vk = IF[k + i*M];
+
+            if (vk < 1) continue;
 
             aux = cuCmul(Ho[k+M*k],
-                    cuCmul(C[i],make_cuDoubleComplex(v[k],0)));
+                    cuCmul(C[i],make_cuDoubleComplex(vk,0)));
 
             w = cuCadd(w,aux);
 
@@ -120,7 +124,9 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
             {
                 if (l == k) continue;
 
-                sqrtOf = make_cuDoubleComplex(sqrt((double)v[k]*(v[l]+ 1)),0);
+                vl = IF[l + i*M];
+
+                sqrtOf = make_cuDoubleComplex(sqrt((double)vk*(vl+ 1)),0);
 
                 j = Map[i + k * nc + l * M * nc];
 
@@ -129,15 +135,15 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
             }
         }
 
-/*
 
         // ---------------------------------------------
         // Rule 1: Creation on k k / Annihilation on k k
         // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
+            vk = IF[k + i*M];
             hIndex = k + M * k + M2 * k + M3 * k;
-            sqrtOf = make_cuDoubleComplex(v[k] * (v[k] - 1),0);
+            sqrtOf = make_cuDoubleComplex(vk * (vk - 1),0);
             aux = cuCmul(Hint[hIndex],cuCmul(C[i],sqrtOf));
             z = cuCadd(z,aux);
         }
@@ -148,11 +154,14 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
-            if (v[k] < 1) continue;
+            vk = IF[k + i*M];
+            if (vk < 1) continue;
+
             for (s = k + 1; s < M; s++)
             {
+                vs = IF[s + i*M];
                 hIndex = k + s * M + k * M2 + s * M3;
-                sqrtOf = make_cuDoubleComplex(4 * v[k] * v[s],0);
+                sqrtOf = make_cuDoubleComplex(4 * vk * vs,0);
                 aux = cuCmul(Hint[hIndex],cuCmul(sqrtOf,C[i]));
                 z = cuCadd(z,aux);
                 // z += 4 * Hint[k + s*M + k*M2 + s*M3] * sqrtOf * C[i];
@@ -165,19 +174,22 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
-            if (v[k] < 2) continue;
+            vk = IF[k + i*M];
+            if (vk < 2) continue;
 
             for (q = 0; q < M; q++)
             {
                 if (q == k) continue;
 
+                vq = IF[q + i*M];
+
                 hIndex = k + k * M + q * M2 + q * M3;
 
                 sqrtOf = make_cuDoubleComplex(
-                        sqrt((double)(v[k]-1)*v[k]*(v[q]+1)*(v[q]+2)),0);
+                        sqrt((double)(vk-1)*vk*(vq+1)*(vq+2)),0);
 
                 chunks = 0;
-                for (j = 0; j < k; j++) { if (v[j] > 1) chunks++; }
+                for (j = 0; j < k; j++) { if (IF[j+i*M] > 1) chunks++; }
                 strideOrb = chunks * M * M;
 
                 j = MapOT[strideOT[i] + strideOrb + q + q * M];
@@ -194,17 +206,19 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
-            if (v[k] < 2) continue;
+            vk = IF[k + i*M];
+            if (vk < 2) continue;
 
             for (l = 0; l < M; l++)
             {
 
                 if (l == k) continue;
+                vl = IF[l + i*M];
 
                 hIndex = k + k * M + k * M2 + l * M3;
 
                 sqrtOf = make_cuDoubleComplex(
-                        2*(v[k]-1)*sqrt((double)v[k]*(v[l]+1)),0);
+                        2*(vk-1)*sqrt((double)vk*(vl+1)),0);
 
                 j = Map[i + k * nc + l * M * nc];
 
@@ -220,16 +234,17 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
-            if (v[k] < 1) continue;
+            vk = IF[k + i*M];
+            if (vk < 1) continue;
 
             for (s = 0; s < M; s++)
             {
-                if (s == k || v[s] < 1) continue;
+                vs = IF[s + i*M];
+                if (s == k || vs < 1) continue;
 
                 hIndex = k + s * M + s * M2 + s * M3;
 
-                sqrtOf = make_cuDoubleComplex(
-                        2*v[s]*sqrt((double)v[k]*(v[s]+1)),0);
+                sqrtOf = make_cuDoubleComplex(2*vs*sqrt((double)vk*(vs+1)),0);
 
                 j = Map[i + k * nc + s * M * nc];
 
@@ -246,21 +261,25 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
-            if (v[k] < 2) continue;
+            vk = IF[k + i*M];
+            if (vk < 2) continue;
 
             for (q = k + 1; q < M; q++)
             {
+                vq = IF[q + i*M];
+
                 for (l = q + 1; l < M; l++)
                 {
+                    vl = IF[l + i*M];
                     hIndex = k + k * M + q * M2 + l * M3;
 
                     sqrtOf = make_cuDoubleComplex(
-                            2*sqrt((double)v[k]*(v[k]-1)*(v[q]+1)*(v[l]+1)),0);
+                            2*sqrt((double)vk*(vk-1)*(vq+1)*(vl+1)),0);
 
                     chunks = 0;
                     for (j = 0; j < k; j++)
                     {
-                        if (v[j] > 1) chunks++;
+                        if (IF[j + i*M] > 1) chunks++;
                     }
                     strideOrb = chunks * M * M;
 
@@ -281,21 +300,25 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (q = 0; q < M; q++)
         {
+            vq = IF[q + i*M];
+
             for (k = q + 1; k < M; k++)
             {
-                if (v[k] < 2) continue;
+                vk = IF[k + i*M];
+                if (vk < 2) continue;
 
                 for (l = k + 1; l < M; l++)
                 {
+                    vl = IF[l + i*M];
                     hIndex = k + k * M + q * M2 + l * M3;
 
                     sqrtOf = make_cuDoubleComplex(
-                            2*sqrt((double)v[k]*(v[k]-1)*(v[q]+1)*(v[l]+1)),0);
+                            2*sqrt((double)vk*(vk-1)*(vq+1)*(vl+1)),0);
 
                     chunks = 0;
                     for (j = 0; j < k; j++)
                     {
-                        if (v[j] > 1) chunks++;
+                        if (IF[j + i*M] > 1) chunks++;
                     }
                     strideOrb = chunks * M * M;
 
@@ -316,19 +339,27 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (q = 0; q < M; q++)
         {
+            vq = IF[q + i*M];
+
             for (l = q + 1; l < M; l++)
             {
+                vl = IF[l + i*M];
+
                 for (k = l + 1; k < M; k++)
                 {
+                    vk = IF[k + i*M];
+
+                    if (vk < 2) continue;
+
                     hIndex = k + k * M + q * M2 + l * M3;
 
                     sqrtOf = make_cuDoubleComplex(
-                            2*sqrt((double)v[k]*(v[k]-1)*(v[q]+1)*(v[l]+1)),0);
+                            2*sqrt((double)vk*(vk-1)*(vq+1)*(vl+1)),0);
 
                     chunks = 0;
                     for (j = 0; j < k; j++)
                     {
-                        if (v[j] > 1) chunks++;
+                        if (IF[j + i*M] > 1) chunks++;
                     }
                     strideOrb = chunks * M * M;
 
@@ -349,31 +380,36 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (q = 0; q < M; q++)
         {
+            vq = IF[q + i*M];
+
             for (k = q + 1; k < M; k++)
             {
-                if (v[k] < 1) continue;
+
+                vk = IF[k + i*M];
+                if (vk < 1) continue;
 
                 for (s = k + 1; s < M; s++)
                 {
-                    if (v[s] < 1) continue;
+                    vs = IF[s + i*M];
+                    if (vs < 1) continue;
 
                     hIndex = k + s * M + q * M2 + q * M3;
 
                     sqrtOf = make_cuDoubleComplex(
-                            2*sqrt((double)v[k]*v[s]*(v[q]+1)*(v[q]+2)),0);
+                            2*sqrt((double)vk*vs*(vq+1)*(vq+2)),0);
 
                     chunks = 0;
                     for (h = 0; h < k; h++)
                     {
                         for (g = h + 1; g < M; g++)
                         {
-                            if (v[h] > 0 && v[g] > 0) chunks++;
+                            if (IF[h+i*M] > 0 && IF[g+i*M] > 0) chunks++;
                         }
                     }
 
                     for (g = k + 1; g < s; g++)
                     {
-                        if (v[g] > 0) chunks++;
+                        if (IF[g + i*M] > 0) chunks++;
                     }
 
                     strideOrb = chunks * M * M;
@@ -395,30 +431,34 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
-            if (v[k] < 1) continue;
+            vk = IF[k + i*M];
+            if (vk < 1) continue;
+
             for (q = k + 1; q < M; q++)
             {
+                vq = IF[q + i*M];
                 for (s = q + 1; s < M; s++)
                 {
-                    if (v[s] < 1) continue;
+                    vs = IF[s + i*M];
+                    if (vs < 1) continue;
 
                     hIndex = k + s * M + q * M2 + q * M3;
 
                     sqrtOf = make_cuDoubleComplex(
-                            2*sqrt((double)v[k]*v[s]*(v[q]+1)*(v[q]+2)),0);
+                            2*sqrt((double)vk*vs*(vq+1)*(vq+2)),0);
 
                     chunks = 0;
                     for (h = 0; h < k; h++)
                     {
                         for (g = h + 1; g < M; g++)
                         {
-                            if (v[h] > 0 && v[g] > 0) chunks++;
+                            if (IF[h+i*M] > 0 && IF[g+i*M] > 0) chunks++;
                         }
                     }
 
                     for (g = k + 1; g < s; g++)
                     {
-                        if (v[g] > 0) chunks++;
+                        if (IF[g + i*M] > 0) chunks++;
                     }
 
                     strideOrb = chunks * M * M;
@@ -440,30 +480,35 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
-            if (v[k] < 1) continue;
+            vk = IF[k + i*M];
+            if (vk < 1) continue;
+
             for (s = k + 1; s < M; s++)
             {
-                if (v[s] < 1) continue;
+                vs = IF[s + i*M];
+                if (vs < 1) continue;
+
                 for (q = s + 1; q < M; q++)
                 {
+                    vq = IF[q + i*M];
 
                     hIndex = k + s * M + q * M2 + q * M3;
 
                     sqrtOf = make_cuDoubleComplex(
-                            2*sqrt((double)v[k]*v[s]*(v[q]+1)*(v[q]+2)),0);
+                            2*sqrt((double)vk*vs*(vq+1)*(vq+2)),0);
 
                     chunks = 0;
                     for (h = 0; h < k; h++)
                     {
                         for (g = h + 1; g < M; g++)
                         {
-                            if (v[h] > 0 && v[g] > 0) chunks++;
+                            if (IF[h+i*M] > 0 && IF[g+i*M] > 0) chunks++;
                         }
                     }
 
                     for (g = k + 1; g < s; g++)
                     {
-                        if (v[g] > 0) chunks++;
+                        if (IF[g + i*M] > 0) chunks++;
                     }
 
                     strideOrb = chunks * M * M;
@@ -485,20 +530,24 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (s = 0; s < M; s++)
         {
-            if (v[s] < 1) continue; // may improve performance
+            vs = IF[s + i*M];
+            if (vs < 1) continue;
 
             for (k = 0; k < M; k++)
             {
-                if (v[k] < 1 || k == s) continue;
+                vk = IF[k + i*M];
+                if (vk < 1 || k == s) continue;
 
                 for (l = 0; l < M; l++)
                 {
                     if (l == k || l == s) continue;
 
+                    vl = IF[l + i*M];
+
                     hIndex = k + s * M + s * M2 + l * M3;
 
                     sqrtOf = make_cuDoubleComplex(
-                            4*v[s]*sqrt((double)v[k]*(v[l]+1)),0);
+                            4*vs*sqrt((double)vk*(vl+1)),0);
 
                     j = Map[i + k * nc + l * M * nc];
 
@@ -517,37 +566,41 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
-            if (v[k] < 1) continue;
+            vk = IF[k + i*M];
+            if (vk < 1) continue;
 
             for (s = k + 1; s < M; s++)
             {
-                if (v[s] < 1) continue;
+                vs = IF[s + i*M];
+                if (vs < 1) continue;
 
                 for (q = 0; q < M; q++)
                 {
                     if (q == s || q == k) continue;
+                    vq = IF[q + i*M];
 
                     for (l = q + 1; l < M; l ++)
                     {
                         if (l == k || l == s) continue;
+                        vl = IF[l + i*M];
 
                         hIndex = k + s * M + q * M2 + l * M3;
 
                         sqrtOf = make_cuDoubleComplex(
-                                4*sqrt((double)v[k]*v[s]*(v[q]+1)*(v[l]+1)),0);
+                                4*sqrt((double)vk*vs*(vq+1)*(vl+1)),0);
 
                         chunks = 0;
                         for (h = 0; h < k; h++)
                         {
                             for (g = h + 1; g < M; g++)
                             {
-                                if (v[h] > 0 && v[g] > 0) chunks++;
+                                if (IF[h+i*M] > 0 && IF[g+i*M] > 0) chunks++;
                             }
                         }
 
                         for (g = k + 1; g < s; g++)
                         {
-                            if (v[g] > 0) chunks++;
+                            if (IF[g + i*M] > 0) chunks++;
                         }
 
                         strideOrb = chunks * M * M;
@@ -565,7 +618,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
             }           // Finish s
         }               // Finish k
 
-*/
         aux = cuCmul(z,make_cuDoubleComplex(0.5,0));
 
         out[i] = cuCadd(w,aux);

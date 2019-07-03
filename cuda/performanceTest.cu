@@ -31,7 +31,6 @@ int main(int argc, char * argv[])
         z;
 
     Iarray
-        d_occ,
         Map,
         d_Map,
         MapOT,
@@ -41,7 +40,6 @@ int main(int argc, char * argv[])
         IFmat,
         d_IFmat,
         NCmat,
-        d_NCmat,
         strideOT,
         d_strideOT,
         strideTT,
@@ -78,9 +76,7 @@ int main(int argc, char * argv[])
 
     // alloc NCmat and IFmat on device
 
-    cu_iarrDef( (Npar + 1)*(Morb + 1) , &d_NCmat );
     cu_iarrDef( nc * Morb , &d_IFmat );
-    cu_iarrDef( Morb , &d_occ );
 
     strideTT = iarrDef(nc);
     strideOT = iarrDef(nc);
@@ -101,15 +97,6 @@ int main(int argc, char * argv[])
     cu_iarrDef( strideTT[nc-1] , &d_MapTT );
 
     // Copy data from host to device
-
-    nbytes = (Npar + 1) * (Morb + 1) * sizeof(int);
-    err = cudaMemcpy(d_NCmat,NCmat,nbytes,cudaMemcpyHostToDevice);
-    if (err != cudaSuccess)
-    {
-        printf("\n\nFailed to copy data from Host to Device - ");
-        printf(" error code : %s!\n\n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
 
     nbytes = nc * Morb * sizeof(int);
     err = cudaMemcpy(d_IFmat,IFmat,nbytes,cudaMemcpyHostToDevice);
@@ -307,7 +294,7 @@ int main(int argc, char * argv[])
     blocks = (nc + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
     applyHconf<<<blocks,THREADS_PER_BLOCK>>>(Npar,Morb,d_Map,d_MapOT,d_MapTT,
-            d_strideOT,d_strideTT,d_IFmat,d_occ,d_C,d_Ho,d_Hint,d_out);
+            d_strideOT,d_strideTT,d_IFmat,d_C,d_Ho,d_Hint,d_out);
 
     cudaDeviceSynchronize();
 
@@ -342,13 +329,11 @@ int main(int argc, char * argv[])
     cudaFree(d_Ho);
     cudaFree(d_Hint);
     cudaFree(d_IFmat);
-    cudaFree(d_NCmat);
     cudaFree(d_strideOT);
     cudaFree(d_strideTT);
     cudaFree(d_MapOT);
     cudaFree(d_MapTT);
     cudaFree(d_Map);
-    cudaFree(d_occ);
 
     printf("\n\nDone.\n\n");
     return 0;
