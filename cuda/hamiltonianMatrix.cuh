@@ -296,6 +296,7 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
             for (k = q + 1; k < M; k++)
             {
                 if (v[k] < 2) continue;
+
                 for (l = k + 1; l < M; l++)
                 {
                     hIndex = k + k * M + q * M2 + l * M3;
@@ -547,7 +548,7 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                     {
                         if (l == k || l == s) continue;
 
-                        hIndex = k + s * M + q * M2 + s * M3;
+                        hIndex = k + s * M + q * M2 + l * M3;
 
                         sqrtOf = make_cuDoubleComplex(
                                 4*sqrt((double)v[k]*v[s]*(v[q]+1)*(v[l]+1)),0);
