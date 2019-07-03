@@ -51,7 +51,7 @@ void d_NC(int N, int M, int * nc)
 
 __global__
 void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
-     Iarray strideOT, Iarray strideTT, Iarray NCmat, Iarray IF, Iarray v,
+     Iarray strideOT, Iarray strideTT, Iarray IF, Iarray v,
      Carray C, Carray Ho, Carray Hint, Carray out)
 {
     // Apply the many-body hamiltonian in a state expressed in
@@ -129,17 +129,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
             }
         }
 
+/*
 
-        /* ================================================================ *
-         *                                                                  *
-         *                       Two-body contribution                      *
-         *                                                                  *
-         * ================================================================ */
-
-
-        /* ---------------------------------------------
-         * Rule 1: Creation on k k / Annihilation on k k
-        ------------------------------------------------------------------- */
+        // ---------------------------------------------
+        // Rule 1: Creation on k k / Annihilation on k k
+        // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
             hIndex = k + M * k + M2 * k + M3 * k;
@@ -147,12 +141,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
             aux = cuCmul(Hint[hIndex],cuCmul(C[i],sqrtOf));
             z = cuCadd(z,aux);
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* ---------------------------------------------
-         * Rule 2: Creation on k s / Annihilation on k s
-        ------------------------------------------------------------------- */
+        // ---------------------------------------------
+        // Rule 2: Creation on k s / Annihilation on k s
+        // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
             if (v[k] < 1) continue;
@@ -165,12 +158,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 // z += 4 * Hint[k + s*M + k*M2 + s*M3] * sqrtOf * C[i];
             }
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* ---------------------------------------------
-         * Rule 3: Creation on k k / Annihilation on q q
-        ------------------------------------------------------------------- */
+        // ---------------------------------------------
+        // Rule 3: Creation on k k / Annihilation on q q
+        // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
             if (v[k] < 2) continue;
@@ -195,12 +187,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 // z += Hint[k + k * M + q * M2 + q * M3] * C[j] * sqrtOf;
             }
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* ---------------------------------------------
-         * Rule 4: Creation on k k / Annihilation on k l
-        ------------------------------------------------------------------- */
+        // ---------------------------------------------
+        // Rule 4: Creation on k k / Annihilation on k l
+        // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
             if (v[k] < 2) continue;
@@ -222,12 +213,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 // z += 2 * Hint[k + k * M + k * M2 + l * M3] * C[j] * sqrtOf;
             }
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* ---------------------------------------------
-         * Rule 5: Creation on k s / Annihilation on s s
-        ------------------------------------------------------------------- */
+        // ---------------------------------------------
+        // Rule 5: Creation on k s / Annihilation on s s
+        // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
             if (v[k] < 1) continue;
@@ -249,12 +239,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 // z += 2 * Hint[k + s * M + s * M2 + s * M3] * C[j] * sqrtOf;
             }
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* -----------------------------------------------------------
-         * Rule 6.0: Creation on k k / Annihilation on q l (k < q < l)
-        ------------------------------------------------------------------- */
+        // -----------------------------------------------------------
+        // Rule 6.0: Creation on k k / Annihilation on q l (k < q < l)
+        // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
             if (v[k] < 2) continue;
@@ -285,12 +274,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 }
             }
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* -----------------------------------------------------------
-         * Rule 6.1: Creation on k k / Annihilation on q l (q < k < l)
-        ------------------------------------------------------------------- */
+        // -----------------------------------------------------------
+        // Rule 6.1: Creation on k k / Annihilation on q l (q < k < l)
+        // -------------------------------------------------------------------
         for (q = 0; q < M; q++)
         {
             for (k = q + 1; k < M; k++)
@@ -321,12 +309,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 }
             }
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* -----------------------------------------------------------
-         * Rule 6.2: Creation on k k / Annihilation on q l (q < l < k)
-        ------------------------------------------------------------------- */
+        // -----------------------------------------------------------
+        // Rule 6.2: Creation on k k / Annihilation on q l (q < l < k)
+        // -------------------------------------------------------------------
         for (q = 0; q < M; q++)
         {
             for (l = q + 1; l < M; l++)
@@ -355,12 +342,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 }
             }
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* -----------------------------------------------------------
-         * Rule 7.0: Creation on k s / Annihilation on q q (q > k > s)
-        ------------------------------------------------------------------- */
+        // -----------------------------------------------------------
+        // Rule 7.0: Creation on k s / Annihilation on q q (q > k > s)
+        // -------------------------------------------------------------------
         for (q = 0; q < M; q++)
         {
             for (k = q + 1; k < M; k++)
@@ -402,12 +388,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 }
             }
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* -----------------------------------------------------------
-         * Rule 7.1: Creation on k s / Annihilation on q q (k > q > s)
-        ------------------------------------------------------------------- */
+        // -----------------------------------------------------------
+        // Rule 7.1: Creation on k s / Annihilation on q q (k > q > s)
+        // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
             if (v[k] < 1) continue;
@@ -448,12 +433,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 }
             }
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* -----------------------------------------------------------
-         * Rule 7.2: Creation on k s / Annihilation on q q (k > s > q)
-        ------------------------------------------------------------------- */
+        // -----------------------------------------------------------
+        // Rule 7.2: Creation on k s / Annihilation on q q (k > s > q)
+        // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
             if (v[k] < 1) continue;
@@ -494,12 +478,11 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 }
             }
         }
-        /* ---------------------------------------------------------------- */
 
 
-        /* ---------------------------------------------
-         * Rule 8: Creation on k s / Annihilation on s l
-        ------------------------------------------------------------------- */
+        // ---------------------------------------------
+        // Rule 8: Creation on k s / Annihilation on s l
+        // -------------------------------------------------------------------
         for (s = 0; s < M; s++)
         {
             if (v[s] < 1) continue; // may improve performance
@@ -529,9 +512,9 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         }
 
 
-        /* ---------------------------------------------
-         * Rule 9: Creation on k s / Annihilation on q l
-        ------------------------------------------------------------------- */
+        // ---------------------------------------------
+        // Rule 9: Creation on k s / Annihilation on q l
+        // -------------------------------------------------------------------
         for (k = 0; k < M; k++)
         {
             if (v[k] < 1) continue;
@@ -582,6 +565,7 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
             }           // Finish s
         }               // Finish k
 
+*/
         aux = cuCmul(z,make_cuDoubleComplex(0.5,0));
 
         out[i] = cuCadd(w,aux);

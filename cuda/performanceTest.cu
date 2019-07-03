@@ -307,7 +307,7 @@ int main(int argc, char * argv[])
     blocks = (nc + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
     applyHconf<<<blocks,THREADS_PER_BLOCK>>>(Npar,Morb,d_Map,d_MapOT,d_MapTT,
-            d_strideOT,d_strideTT,d_NCmat,d_IFmat,d_occ,d_C,d_Ho,d_Hint,d_out);
+            d_strideOT,d_strideTT,d_IFmat,d_occ,d_C,d_Ho,d_Hint,d_out);
 
     cudaDeviceSynchronize();
 
