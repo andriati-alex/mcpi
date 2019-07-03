@@ -201,6 +201,8 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         }
 
 
+
+
         // ---------------------------------------------
         // Rule 4: Creation on k k / Annihilation on k l
         // -------------------------------------------------------------------
@@ -373,6 +375,7 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 }
             }
         }
+
 
 
         // -----------------------------------------------------------
@@ -617,6 +620,8 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                 }       // Finish q
             }           // Finish s
         }               // Finish k
+
+
 
         aux = cuCmul(z,make_cuDoubleComplex(0.5,0));
 

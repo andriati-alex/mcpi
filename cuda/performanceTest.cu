@@ -108,7 +108,7 @@ int main(int argc, char * argv[])
     }
 
     nbytes = nc * sizeof(int);
-    err = cudaMemcpy(d_strideOT,strideOT,nc,cudaMemcpyHostToDevice);
+    err = cudaMemcpy(d_strideOT,strideOT,nbytes,cudaMemcpyHostToDevice);
     if (err != cudaSuccess)
     {
         printf("\n\nFailed to copy data from Host to Device - ");
