@@ -71,20 +71,20 @@ int main(int argc, char * argv[])
     sscanf(argv[2],"%d",&Morb);
     nc = NC(Npar,Morb);
 
-    NCmat = MountNCmat(Npar,Morb);
-    IFmat = MountFocks(Npar,Morb);
+    NCmat = setupNCmat(Npar,Morb);
+    IFmat = setupFocks(Npar,Morb);
 
     // alloc NCmat and IFmat on device
 
-    cu_iarrDef( nc * Morb , &d_IFmat );
+    cuda_iarrDef( nc * Morb , &d_IFmat );
 
     strideTT = iarrDef(nc);
     strideOT = iarrDef(nc);
 
     // alloc Map's strides on device
 
-    cu_iarrDef( nc , &d_strideTT );
-    cu_iarrDef( nc , &d_strideOT );
+    cuda_iarrDef( nc , &d_strideTT );
+    cuda_iarrDef( nc , &d_strideOT );
 
     Map = OneOneMap(Npar,Morb,NCmat,IFmat);
     MapTT = TwoTwoMap(Npar,Morb,NCmat,IFmat,strideTT);
@@ -92,9 +92,9 @@ int main(int argc, char * argv[])
 
     // alloc Maps on device
 
-    cu_iarrDef( nc * Morb * Morb , &d_Map );
-    cu_iarrDef( strideOT[nc-1] + Morb*Morb , &d_MapOT );
-    cu_iarrDef( strideTT[nc-1] , &d_MapTT );
+    cuda_iarrDef( nc * Morb * Morb , &d_Map );
+    cuda_iarrDef( strideOT[nc-1] + Morb*Morb , &d_MapOT );
+    cuda_iarrDef( strideTT[nc-1] , &d_MapTT );
 
     // Copy data from host to device
 
@@ -188,10 +188,10 @@ int main(int argc, char * argv[])
     out = carrDef(nc);
 
     // alloc device arrays
-    cu_carrDef(nc,&d_out);
-    cu_carrDef(nc,&d_C);
-    cu_carrDef(Morb*Morb,&d_Ho);
-    cu_carrDef(Morb*Morb*Morb*Morb,&d_Hint);
+    cuda_carrDef(nc,&d_out);
+    cuda_carrDef(nc,&d_C);
+    cuda_carrDef(Morb*Morb,&d_Ho);
+    cuda_carrDef(Morb*Morb*Morb*Morb,&d_Hint);
 
     sum = 0.0;
     for (i = 0; i < nc; i++)

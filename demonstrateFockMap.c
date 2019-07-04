@@ -1,3 +1,19 @@
+
+/**      PROGRAM TO DEMONSTRATE HOW THE MAPPING OF CONFIGURATIONS WORKS
+ *
+ * Demonstrate the basics functions useful for computation of many-body
+ * quantities in Fock state basis. Compile it :
+ *
+ * icc demonstrateFockMap.c -lm -o exe (if available)
+ * gcc demonstrateFockMap.c -lm -o exe
+ *
+ * ./exe Nparticles Norbitals
+ *
+ *---------------------------------------------------------------------------
+*/
+
+
+
 #include "configurationsMap.h"
 
 
@@ -53,8 +69,8 @@ int main(int argc, char * argv[])
     stridesTT = iarrDef(nc);
     stridesOT = iarrDef(nc);
 
-    NCmat = MountNCmat(Npar,Morb);
-    IFmat = MountFocks(Npar,Morb);
+    NCmat = setupNCmat(Npar,Morb);
+    IFmat = setupFocks(Npar,Morb);
 
     Map = OneOneMap(Npar,Morb,NCmat,IFmat);
     MapTT = TwoTwoMap(Npar,Morb,NCmat,IFmat,stridesTT);

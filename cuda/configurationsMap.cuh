@@ -41,7 +41,7 @@ Rarray rarrDef(int n)
 
 
 
-void cu_rarrDef(int n, Rarray * ptr_address)
+void cuda_rarrDef(int n, Rarray * ptr_address)
 {
 
     // Error code to check return values for CUDA calls
@@ -79,7 +79,7 @@ Carray carrDef(int n)
 
 
 
-void cu_carrDef(int n, Carray * ptr_address)
+void cuda_carrDef(int n, Carray * ptr_address)
 {
 
     // Error code to check return values for CUDA calls
@@ -118,7 +118,7 @@ Iarray iarrDef(int n)
 
 
 
-void cu_iarrDef(int n, Iarray * ptr_address)
+void cuda_iarrDef(int n, Iarray * ptr_address)
 {
 
     // Error code to check return values for CUDA calls
@@ -178,7 +178,7 @@ int NC(int N, int M)
 
 
 
-Iarray MountNCmat(int N, int M)
+Iarray setupNCmat(int N, int M)
 {
 
 /** Matrix of all possible outcomes form NC function with
@@ -278,7 +278,7 @@ int FockToIndex(int N, int M, Iarray NCmat, Iarray v)
 
 
 
-Iarray MountFocks(int N, int M)
+Iarray setupFocks(int N, int M)
 {
 
 /** All possible occupation vectors in a vector. To get the occupations
@@ -407,6 +407,57 @@ Iarray allocTwoTwoMap(int nc, int M, Iarray IF)
 
 Iarray TwoTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
 {
+
+/** From one configuration find another by removing one particle in two
+  * different states and adding two in other two arbitrary  states.  To
+  * build such a structure in a vector of integers  it  looks  in  each
+  * configuration how many different possibilities  are  to  remove two
+  * particles from two different states, and for  each time  it happens
+  * there are M^2 different places to put those  particles.  Thus  this
+  * function also has as output the last argument, vector strideC which
+  * for each  enumerated configuration  i  store the integer number,  a
+  * index of the mapping where those possibilites to remove two particle
+  * starts.
+  *
+  * EXAMPLE : Given a configuration i, find configuration j which has
+  * a particle less in states 'k' ans 's' (s > k),  and  two  more on
+  * states 'q' and 'l'.
+  *
+  * SOL : Using the map returned by this structure we start by the
+  * stride from the configuration i, so,
+  *
+  * m = strideC[i];
+  *
+  * for h = 0 ... k - 1
+  * {
+  *     for g = h + 1 ... M - 1
+  *     {
+  *         if occupation on h and g are greater than 1 then
+  *         {
+  *             m = m + M * M;
+  *         }
+  *     }
+  * }
+  *
+  * for g = k + 1 ... s - 1
+  * {
+  *     if occupation on k and g are greater than 1 then
+  *     {
+  *         m = m + M * M;
+  *     }
+  * }
+  *
+  * after adding the orbital strides proportional to the M^2 possibilities
+  * where the particles removed can be placed, finish adding
+  *
+  * m = q + l * M;
+  *
+  * j = MapTT[m];
+  *
+  * -------------------------------------------------------------------------
+  *
+**/
+
     int
         i,
         k,
@@ -517,42 +568,33 @@ Iarray allocOneTwoMap(int nc, int M, Iarray IF)
 
 
 
-int TwoTwoMapSize(int nc, int M, Iarray IF)
-{
-
-    int
-        i,
-        k,
-        s,
-        chunks;
-
-    chunks = 0;
-
-    for (i = 0; i < nc; i++)
-    {
-
-        for (k = 0; k < M; k++)
-        {
-
-            if (IF[k + i * M] < 1) continue;
-
-            for (s = k + 1; s < M; s++)
-            {
-
-                if (IF[s + i * M] < 1) continue;
-
-                chunks++;
-            }
-        }
-    }
-
-    return chunks * M * M;
-}
-
-
-
 Iarray OneTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
 {
+
+/** From one configuration find another by removing two particle from a
+  * state and adding two in other two arbitrary states. The strategy to
+  * store the index of these transition between the states are  similar
+  * to the described in TwoTwoMap function, but a bit more simpler.
+  *
+  * EXAMPLE : Given a configuration i, find configuration j which has
+  * a two particle less in state 'k' and 's' (s > k), and place  them
+  * in states 'q' and 'l'
+  *
+  * m = strideC[i];
+  *
+  * for h = 0 ... k - 1
+  * {
+  *     if occupation on h and g are greater than 2 then
+  *     {
+  *         m = m + M * M;
+  *     }
+  * }
+  *
+  * j = MapTT[m + q + l*M];
+  *
+  * -------------------------------------------------------------------------
+  *
+  */
     
     int
         i,

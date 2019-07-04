@@ -1,3 +1,17 @@
+
+/**  APPLY THE ROUTINES TO COMPUTE MANY-BODY QUANTITIES AHD SHOW PERFORMANCE
+ *
+ * compile :
+ *
+ * icc performanceTest.c -lm -o exe (if available)
+ * gcc performanceText.c -lm -o exe
+ *
+ * ./exe Nparticles Norbitals
+ *
+ *---------------------------------------------------------------------------
+ *
+*/
+
 #include "onebodyMatrix.h"
 #include "twobodyMatrix.h"
 #include "hamiltonianMatrix.h"
@@ -66,8 +80,8 @@ int main(int argc, char * argv[])
     sscanf(argv[2],"%d",&Morb);
     nc = NC(Npar,Morb);
 
-    NCmat = MountNCmat(Npar,Morb);
-    IFmat = MountFocks(Npar,Morb);
+    NCmat = setupNCmat(Npar,Morb);
+    IFmat = setupFocks(Npar,Morb);
 
     printf("\nNumber of particles : %3d", Npar);
     printf("\nNumber of orbitals  : %3d", Morb);
