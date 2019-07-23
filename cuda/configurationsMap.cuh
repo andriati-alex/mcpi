@@ -140,10 +140,12 @@ void cuda_iarrDef(int n, Iarray * ptr_address)
 
 
 
-int fac(int n)
+long fac(int n)
 {
     int
-        i,
+        i;
+
+    long
         nfac;
 
     nfac = 1;

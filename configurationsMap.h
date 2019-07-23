@@ -153,26 +153,19 @@ void IndexToFock(int k, int N, int M, Iarray v)
 
     int
         i,
-        m,
-        x;
+        m;
 
     m = M - 1;
 
     for (i = 0; i < M; i++) v[i] = 0;
 
-    // Put the particles in orbitals while has combinations to spend
     while ( k > 0 )
     {
         while ( k - NC(N,m) < 0 ) m = m - 1;
 
-        x = k - NC(N,m);
-        while ( x >= 0 )
-        {
-            v[m] = v[m] + 1; // One more particle in orbital m
-            N = N - 1;       // Less one particle to setup
-            k = x;
-            x = x - NC(N,m);
-        }
+        k = k - NC(N,m); // subtract cost
+        v[m] = v[m] + 1; // One more particle in orbital m
+        N = N - 1;       // Less one particle to setup
     }
 
     // with k zero put the rest in the first state
