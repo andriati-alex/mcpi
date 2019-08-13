@@ -1,6 +1,15 @@
 
-/**      PROGRAM TO DEMONSTRATE HOW THE MAPPING OF CONFIGURATIONS WORKS
- *
+/****   AUTHOR INFORMATION
+ 
+ NAME : Alex Valerio Andriati
+ AFFILIATION : University of São Paulo - Brazil
+
+ Last update : 08/13/2019
+
+---------------------------------------------------------------------------
+
+ ****  PROGRAM TO DEMONSTRATE HOW THE MAPPING OF CONFIGURATIONS WORKS
+
  * Demonstrate the basics functions useful for computation of many-body
  * quantities in Fock state basis. Compile it :
  *
@@ -9,8 +18,11 @@
  *
  * ./exe Nparticles Norbitals
  *
- *---------------------------------------------------------------------------
-*/
+ * NOTE : this is suppose to be a simple demonstration, then do not use
+ * large number of particles or orbitals because it would mess up the
+ * output on the screen.
+ *
+ *------------------------------------------------------------------------ */
 
 
 
@@ -78,7 +90,7 @@ int main(int argc, char * argv[])
 
     printf("\nSize of one to one jump map : %d", nc * Morb * Morb);
     printf("\nSize of two to two jump map : %d", stridesTT[nc-1]);
-    printf("\nSize of one to two jump map : %d", stridesOT[nc-1]);
+    printf("\nSize of one to two jump map : %d", stridesOT[nc-1] + Morb*Morb);
 
     printf("\n\n\n");
 

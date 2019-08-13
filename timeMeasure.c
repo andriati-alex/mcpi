@@ -1,16 +1,29 @@
+/****   AUTHOR INFORMATION
+ 
+ NAME : Alex Valerio Andriati
+ AFFILIATION : University of São Paulo - Brazil
 
-/**  APPLY THE ROUTINES TO COMPUTE MANY-BODY QUANTITIES AHD SHOW PERFORMANCE
+ Last update : 08/13/2019
+
+---------------------------------------------------------------------------
+
+ ****  EXECUTABLE TO MEASURE TIME FOR DIFFENRENT NUMBER OF PARTICLES ****
  *
- * compile :
+ * compilation :
+ * -------------
  *
- * icc performanceTest.c -lm -o exe (if available)
- * gcc performanceText.c -lm -o exe
+ * icc timeMeasure.c -lm -o exe (if available)
+ * gcc timeMeasure.c -lm -o exe
  *
- * ./exe Nparticles Norbitals
+ * comments :
+ * ----------
  *
- *---------------------------------------------------------------------------
+ *  This executable record time demanded in each routine varying the number
+ *  of particles in the system. It can be also used to sweep the number of
+ *  single particle states with simple changes in the first for loop by
+ *  allowing 'Morb' to vary and set Npar fixed.
  *
-*/
+ * ----------------------------------------------------------------------- */
 
 #include "onebodyMatrix.h"
 #include "twobodyMatrix.h"
@@ -74,24 +87,13 @@ int main(int argc, char * argv[])
         rho1,
         Ho;
 
+    // record time and fluctuations by standart deviation
     times = fopen("time_used.dat", "w");
     times_std = fopen("time_std.dat", "w");
-/*
-    if (argc != 3)
-    {
-        printf("\n\nERROR: Need two integer numbers from command line ");
-        printf("the first number of particles and second the number of ");
-        printf("orbitals.\n\n");
-        exit(EXIT_FAILURE);
-    }
-
-    sscanf(argv[1],"%d",&Npar);
-    sscanf(argv[2],"%d",&Morb);
-*/
 
     Morb = 3;
 
-    for (Npar = 10; Npar < 100; Npar +=30)
+    for (Npar = 30; Npar < 1050; Npar += 50)
     {
 
         printf("\n\n");
@@ -454,21 +456,6 @@ int main(int argc, char * argv[])
 
         fprintf(times, "%.6lf  ", time_used * 1000);
         fprintf(times_std, "%.6lf  ", time_std * 1000);
-
-    /*
-        cmat_txt("rho1_X.dat",Morb,Morb,rho1_X);
-        cmat_txt("rho1_XM.dat",Morb,Morb,rho1_XM);
-
-        carr_txt("rho2.dat",Morb*Morb*Morb*Morb,rho2);
-        carr_txt("rho2_X.dat",Morb*Morb*Morb*Morb,rho2_X);
-        carr_txt("rho2_XM.dat",Morb*Morb*Morb*Morb,rho2_XM);
-
-        carr_txt("C.dat",nc,out);
-        carr_txt("C_X.dat",nc,out_X);
-        carr_txt("C_XM.dat",nc,out_XX);
-    */
-
-
 
         free(C);
         free(out);

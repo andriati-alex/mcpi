@@ -1,5 +1,14 @@
 
-/**  APPLY THE ROUTINES TO COMPUTE MANY-BODY QUANTITIES AHD SHOW PERFORMANCE
+/****   AUTHOR INFORMATION
+ 
+ NAME : Alex Valerio Andriati
+ AFFILIATION : University of São Paulo - Brazil
+
+ Last update : 08/13/2019
+
+ -------------------------------------------------------------------------
+
+ ****  TEST ROUTINES TO COMPUTE PHYSICAL OPERATORS
  *
  * compile :
  *
@@ -8,9 +17,9 @@
  *
  * ./exe Nparticles Norbitals
  *
- *---------------------------------------------------------------------------
+ * produces several output .dat files for each available implementation
  *
-*/
+ * ----------------------------------------------------------------------- */
 
 #include "onebodyMatrix.h"
 #include "twobodyMatrix.h"
@@ -65,7 +74,6 @@ int main(int argc, char * argv[])
     Cmatrix
         rho1_XM,
         rho1_X,
-        rho1,
         Ho;
 
     if (argc != 3)
@@ -210,13 +218,9 @@ int main(int argc, char * argv[])
     printf("\n\n======================================\n\n");
 
     printf("TIME DEMANDED");
-/*
-    start = clock();
-    for (i = 0; i < 50; i++) OBrho(Npar,Morb,NCmat,C,rho1);
-    end = clock();
-    time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 50;
-    printf("\n\nTime to setup rho1 : %.3lfms", time_used * 1000);
-*/
+
+
+
     start = clock();
     for (i = 0; i < 50; i++) OBrho_X(Npar,Morb,NCmat,IFmat,C,rho1_X);
     end = clock();
@@ -299,9 +303,6 @@ int main(int argc, char * argv[])
     free(out_X);
     free(out_XX);
     free(Map);
-
-    for(i = 0; i < Morb; i++) free(rho1[i]);
-    free(rho1);
 
     for(i = 0; i < Morb; i++) free(rho1_X[i]);
     free(rho1_X);
