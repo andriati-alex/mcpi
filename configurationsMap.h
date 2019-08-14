@@ -169,7 +169,7 @@ void IndexToFock(int k, int N, int M, Iarray v)
     }
 
     // with k zero put the rest in the first state
-    for (i = N; i > 0; i--) v[0] = v[0] + 1;
+    if ( N > 0 ) v[0] = v[0] + N;
 }
 
 
