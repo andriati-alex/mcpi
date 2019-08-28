@@ -142,7 +142,7 @@ void cuda_iarrDef(int n, Iarray * ptr_address)
 
 long fac(int n)
 {
-    int
+    long
         i;
 
     long
@@ -184,7 +184,7 @@ Iarray setupNCmat(int N, int M)
 {
 
 /** Matrix of all possible outcomes form NC function with
-  * NCmat[i + N*j] = NC(i,j).
+  * NCmat[i + (N+1)*j] = NC(i,j).
 **/
 
     int

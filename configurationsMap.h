@@ -77,9 +77,9 @@ Iarray iarrDef(int n)
 
 
 
-int fac(int n)
+long fac(int n)
 {
-    int
+    long
         i,
         nfac;
 

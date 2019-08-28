@@ -2,6 +2,9 @@
 #define _hamiltonianMatrix_h
 
 #include <math.h>
+#ifdef _OPENMP
+    #include <omp.h>
+#endif
 #include "configurationsMap.h"
 
 
@@ -899,10 +902,14 @@ void applyHconf_XX (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
         w;
 
     nc = NC(N,M);
+
+
+#pragma omp parallel private(i,j,k,s,q,l,h,g,chunks,strideOrb,z,w,sqrtOf,v)
+    {
+
     v = iarrDef(M);
 
-
-
+#pragma omp for schedule(static)
     for (i = 0; i < nc; i++)
     {
         w = 0;
@@ -1389,6 +1396,8 @@ void applyHconf_XX (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
     }
 
     free(v);
+
+    } // end of parallel region
 
 }
 

@@ -204,7 +204,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
 
                 aux = cuCmul(Hint[hIndex],cuCmul(sqrtOf,C[j]));
                 z = cuCadd(z,aux);
-                // z += Hint[k + k * M + q * M2 + q * M3] * C[j] * sqrtOf;
             }
         }
 
@@ -234,7 +233,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
 
                 aux = cuCmul(Hint[hIndex],cuCmul(C[j],sqrtOf));
                 z = cuCadd(z,aux);
-                // z += 2 * Hint[k + k * M + k * M2 + l * M3] * C[j] * sqrtOf;
             }
         }
 
@@ -260,8 +258,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
 
                 aux = cuCmul(Hint[hIndex],cuCmul(C[j],sqrtOf));
                 z = cuCadd(z,aux);
-
-                // z += 2 * Hint[k + s * M + s * M2 + s * M3] * C[j] * sqrtOf;
             }
         }
 
@@ -298,8 +294,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                     aux = cuCmul(Hint[hIndex],cuCmul(C[j],sqrtOf));
 
                     z = cuCadd(z,aux);
-
-                    //z += 2 * Hint[k + k*M + q*M2 + l*M3]*C[j]*sqrtOf;
                 }
             }
         }
@@ -337,8 +331,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                     aux = cuCmul(Hint[hIndex],cuCmul(C[j],sqrtOf));
 
                     z = cuCadd(z,aux);
-
-                    //z += 2 * Hint[k + k*M + q*M2 + l*M3]*C[j]*sqrtOf;
                 }
             }
         }
@@ -378,8 +370,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                     aux = cuCmul(Hint[hIndex],cuCmul(C[j],sqrtOf));
 
                     z = cuCadd(z,aux);
-
-                    //z += 2 * Hint[k + k*M + q*M2 + l*M3]*C[j]*sqrtOf;
                 }
             }
         }
@@ -430,8 +420,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                     aux = cuCmul(Hint[hIndex],cuCmul(C[j],sqrtOf));
 
                     z = cuCadd(z,aux);
-
-                    //z += 2 * Hint[k + s*M + q*M2 + q*M3] * C[j] * sqrtOf;
                 }
             }
         }
@@ -479,8 +467,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                     aux = cuCmul(Hint[hIndex],cuCmul(C[j],sqrtOf));
 
                     z = cuCadd(z,aux);
-
-                    //z += 2 * Hint[k + s*M + q*M2 + q*M3] * C[j] * sqrtOf;
                 }
             }
         }
@@ -529,8 +515,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                     aux = cuCmul(Hint[hIndex],cuCmul(C[j],sqrtOf));
 
                     z = cuCadd(z,aux);
-
-                    //z += 2 * Hint[k + s*M + q*M2 + q*M3] * C[j] * sqrtOf;
                 }
             }
         }
@@ -565,8 +549,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                     aux = cuCmul(Hint[hIndex],cuCmul(C[j],sqrtOf));
 
                     z = cuCadd(z,aux);
-
-                    // z += 4 * Hint[k + s*M + s*M2 + l*M3] * C[j] * sqrtOf;
                 }
             }
         }
@@ -621,9 +603,6 @@ void applyHconf (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
                         aux = cuCmul(Hint[hIndex],cuCmul(C[j],sqrtOf));
 
                         z = cuCadd(z,aux);
-
-                        //z += 4 * Hint[k + s*M + q*M2 + l*M3]*C[j]*sqrtOf;
-
                     }   // Finish l
                 }       // Finish q
             }           // Finish s

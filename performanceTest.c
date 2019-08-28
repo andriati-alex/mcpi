@@ -126,11 +126,6 @@ int main(int argc, char * argv[])
 
 
 
-    rho1 = (double complex **) malloc(Morb * sizeof(double complex *));
-    for (i = 0; i < Morb; i++)
-    {
-        rho1[i] = (double complex *) malloc(Morb * sizeof(double complex));
-    }
 
     rho1_X = (double complex **) malloc(Morb * sizeof(double complex *));
     for (i = 0; i < Morb; i++)
