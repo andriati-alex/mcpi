@@ -293,10 +293,13 @@ int main(int argc, char * argv[])
     // optimally choose the number of blocks
     blocks = (nc + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
-    applyHconf<<<blocks,THREADS_PER_BLOCK>>>(Npar,Morb,d_Map,d_MapOT,d_MapTT,
+    for (i = 0; i < 15; i++)
+    {
+        applyHconf<<<blocks,THREADS_PER_BLOCK>>>(Npar,Morb,d_Map,d_MapOT,d_MapTT,
             d_strideOT,d_strideTT,d_IFmat,d_C,d_Ho,d_Hint,d_out);
 
-    cudaDeviceSynchronize();
+        cudaDeviceSynchronize();
+    }
 
     nbytes = nc * sizeof(cuDoubleComplex);
     err = cudaMemcpy(out,d_out,nbytes,cudaMemcpyDeviceToHost);
