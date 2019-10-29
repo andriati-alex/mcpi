@@ -119,8 +119,11 @@ Iarray setupNCmat(int N, int M)
 {
 
 /** Matrix of all possible outcomes form NC function with
-  * NCmat[i + N*j] = NC(i,j).
-**/
+  * NCmat[i + N*j] = NC(i,j), where i < N and j < M,  the
+  * number of particles and states respectively.
+  *
+  * This is an auxiliar structure to avoid calls of  NC
+  * function many times when converting Fock states **/
 
     int
         i,
@@ -149,7 +152,9 @@ void IndexToFock(int k, int N, int M, Iarray v)
 /** Given an integer index 0 < k < NC(N,M) setup on v
   * the corresponding Fock vector with v[j] being the
   * occupation number on state j.
-**/
+  *
+  * This routine corresponds to an implementation of Algorithm 2
+  * of the article **/
 
     int
         i,
@@ -161,6 +166,8 @@ void IndexToFock(int k, int N, int M, Iarray v)
 
     while ( k > 0 )
     {
+        // Check if can 'pay' the cost to put  the  particle
+        // in current state. If not, try the a 'cheaper' one
         while ( k - NC(N,m) < 0 ) m = m - 1;
 
         k = k - NC(N,m); // subtract cost
@@ -177,9 +184,11 @@ void IndexToFock(int k, int N, int M, Iarray v)
 int FockToIndex(int N, int M, Iarray NCmat, Iarray v)
 {
 
-/** Convert an occupation vector v to a integer number
-  * from 0 to the NC(N,M) - 1.
-**/
+/** Convert an occupation vector v to a integer number from
+  * 0 to the NC(N,M) - 1. It uses the  NCmat  structure  to
+  * avoid calls of NC function, see setupNCmat function above
+  *
+  * This routines is an implementation of algorithm 1 of the article **/
 
     int
         i,
@@ -213,8 +222,10 @@ Iarray setupFocks(int N, int M)
 
 /** All possible occupation vectors in a vector. To get the occupations
   * respect to configuration index k we  use  ItoFock[j + k*M]  with  j
-  * going from 0 to M - 1 (the orbital number).
-**/
+  * going from 0 to M - 1 (the state number).
+  *
+  * This routine defines a hashing table which replace calls of
+  * IndexToFock routine **/
 
     int
         k,
@@ -239,13 +250,14 @@ Iarray setupFocks(int N, int M)
 Iarray OneOneMap(int N, int M, Iarray NCmat, Iarray IF)
 {
 
-/** Given a configuration index, map it in a new one which the
-  * occupation vector differs from the first by a  jump  of  a
-  * particle from one orital to another. Thus given i we have
+/** Given the first configuration index, map it in  a second  one  which
+  * the occupation vector differs from the first by a jump of a particle
+  * from one state to another.
   *
-  * Map[i + k * nc + l * nc * M] = index of a configuration which
-  * have one particle less in k that has been added in l.
-**/
+  * Thus given the first index 'i' :
+  *
+  * Map[i + k * nc + l * nc * M] = index of another Fock state which
+  * have one particle less in k that has been added in l         **/
 
     int i,
         q,
@@ -261,8 +273,14 @@ Iarray OneOneMap(int N, int M, Iarray NCmat, Iarray IF)
     
     v = iarrDef(M);
 
+    // The structure consider that for any configuration, there are
+    // M^2 possible jumps among the individual particle states.  In
+    // spite of the wasted elements from forbidden transitions that
+    // are based on states that are empty, this is no problem compared
+    // to the routines that maps double jumps.
     Map = iarrDef(M * M * nc);
 
+    // Forbidden transitions are marked with -1
     for (i = 0; i < nc * M * M; i++) Map[i] = -1;
 
     for (i = 0; i < nc; i++)
@@ -273,7 +291,7 @@ Iarray OneOneMap(int N, int M, Iarray NCmat, Iarray IF)
 
         for (k = 0; k < M; k++)
         {
-            // Take one particle from k state
+            // check if there is at least a particle to remove
             if (v[k] < 1) continue;
 
             for (l = 0; l < M; l++)
@@ -297,6 +315,16 @@ Iarray OneOneMap(int N, int M, Iarray NCmat, Iarray IF)
 
 Iarray allocTwoTwoMap(int nc, int M, Iarray IF)
 {
+
+/** Structure allocation of mapping between two different Fock states
+  * whose the occupation numbers are related by jumps of  2 particles
+  * from different individual particle states
+  *
+  * Given an non-empty orbital k, look for the next non-empty s > k.
+  * When found such a combination, it is necessary to allocate  M^2
+  * new elements corresponding to the particles destiny, when removed
+  * from orbitals k and s **/
+
     int
         i,
         k,
@@ -383,9 +411,6 @@ Iarray TwoTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
   * m = q + l * M;
   *
   * j = MapTT[m];
-  *
-  * -------------------------------------------------------------------------
-  *
 **/
 
     int
@@ -413,6 +438,10 @@ Iarray TwoTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
 
     for (i = 0; i < nc; i++)
     {
+        // strideC[i] is the index where jumps based on Fock state  i begins
+        // chunksC counts how many possibilities were found for the previous
+        // Fock states, and for each possibility M^2 is the size of the chunk
+        // because of the number of possible destinies for removed particles
         strideC[i] = chunksC * (M * M);
 
         for (k = 0; k < M; k++) occ[k] = IF[k + M * i];
@@ -428,6 +457,11 @@ Iarray TwoTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
             {
 
                 if (occ[s] < 1) continue;
+
+                // If it is possible to remove particles from k and s
+                // we need to setup a chunk that corresponds  to  all
+                // possible destinies for the particles that are going
+                // to be removed from k and s orbitals
 
                 strideO = chunksO * M * M;
 
@@ -450,6 +484,7 @@ Iarray TwoTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
                     }
                 }
 
+                // New chunk set up. Update how many chunks have been done
                 chunksO++;
                 chunksC++;
             }
