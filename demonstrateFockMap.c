@@ -4,25 +4,32 @@
  NAME : Alex Valerio Andriati
  AFFILIATION : University of São Paulo - Brazil
 
- Last update : 08/13/2019
+ Last update : 10/31/2019
 
 ---------------------------------------------------------------------------
 
  ****  PROGRAM TO DEMONSTRATE HOW THE MAPPING OF CONFIGURATIONS WORKS
 
  * Demonstrate the basics functions useful for computation of many-body
- * quantities in Fock state basis. Compile it :
+ * quantities in Fock state basis.
+ *
+ * COMPILATION :
  *
  * icc demonstrateFockMap.c -lm -o exe (if available)
  * gcc demonstrateFockMap.c -lm -o exe
  *
+ * EXECUTION :
+ *
  * ./exe Nparticles Norbitals
+ *
+ * First command line argument is the number of particles and  the second
+ * is the number of orbitals. It prints on the screen all the Fock states
+ * enumerated, that is the hashing table. Moreover it shows the  mappings
+ * for some cases
  *
  * NOTE : this is suppose to be a simple demonstration, then do not use
  * large number of particles or orbitals because it would mess up the
- * output on the screen.
- *
- *------------------------------------------------------------------------ */
+ * output on the screen. **/
 
 
 
@@ -60,7 +67,7 @@ int main(int argc, char * argv[])
     if (argc != 3)
     {
         printf("\n\nERROR: Need two integer numbers from command line ");
-        printf("the first number of particles and second the number of ");
+        printf("first the number of particles and second the number of ");
         printf("orbitals.\n\n");
         exit(EXIT_FAILURE);
     }
@@ -75,7 +82,7 @@ int main(int argc, char * argv[])
 
     if (nc > 5000 || Morb > 7)
     {
-        printf("\n\nWARNING: lARGE SYSTEM.\n\n");
+        printf("\n\nWARNING: lARGE SYSTEM CAN MESS UP THE OUTPUT\n\n");
     }
 
     stridesTT = iarrDef(nc);

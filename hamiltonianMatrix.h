@@ -9,11 +9,24 @@
 
 
 
+/****   AUTHOR INFORMATION
+
+ NAME : Alex Valerio Andriati
+ AFFILIATION : University of Sao Paulo - Brazil
+
+ Last update : 10/31/2019
+
+****/
+
+
+
 void applyHconf (int N, int M, Iarray NCmat, Iarray IF, Carray C, Cmatrix Ho,
      Carray Hint, Carray out)
 {
-    // Apply the many-body hamiltonian in a state expressed in
-    // number-occupation basis with coefficients defined by C.
+
+/** Apply the many-body hamiltonian in a state expressed in
+  * number-occupation basis with coefficients defined by C.
+  * First implementation uses only the hashing table IF **/
 
 
 
@@ -409,8 +422,10 @@ void applyHconf (int N, int M, Iarray NCmat, Iarray IF, Carray C, Cmatrix Ho,
 void applyHconf_X (int N, int M, Iarray Map, Iarray MapOT, Iarray strideOT,
      Iarray NCmat, Iarray IF, Carray C, Cmatrix Ho, Carray Hint, Carray out)
 {
-    // Apply the many-body hamiltonian in a state expressed in
-    // number-occupation basis with coefficients defined by C.
+
+/** Apply the many-body hamiltonian in a state expressed in
+  * number-occupation basis with coefficients defined by C.
+  * Second implementation using some of the maps **/
 
 
 
@@ -867,8 +882,10 @@ void applyHconf_XX (int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
      Iarray strideOT, Iarray strideTT, Iarray IF, Carray C, Cmatrix Ho,
      Carray Hint, Carray out)
 {
-    // Apply the many-body hamiltonian in a state expressed in
-    // number-occupation basis with coefficients defined by C.
+
+/** Apply the many-body hamiltonian in a state expressed in
+  * number-occupation basis with coefficients defined by C.
+  * Third implementation using all mappings **/
 
 
 

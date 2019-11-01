@@ -5,6 +5,16 @@
 #include "configurationsMap.h"
 
 
+/****   AUTHOR INFORMATION
+
+ NAME : Alex Valerio Andriati
+ AFFILIATION : University of Sao Paulo - Brazil
+
+ Last update : 10/31/2019
+
+****/
+
+
 
 /* ========================================================================
  *
@@ -18,12 +28,18 @@
  * annihilation operators for a given many-body state.  Use the basis
  * to express the state and then compute using its coefficients (Cj).
  *
+ * Throughout the computation symmetries and the commutation relation
+ * for the bosonic operators are used.
+ *
  * ======================================================================== */
 
 
 
 void TBrho(int N, int M, Iarray NCmat, Iarray IF, Carray C, Carray rho)
 {
+
+/** Implementation with Hashing table IF. For more details see setupFocks
+  * in configurationsMap.h file **/
 
     int
         i, // int indices to number coeficients
@@ -486,6 +502,10 @@ void TBrho(int N, int M, Iarray NCmat, Iarray IF, Carray C, Carray rho)
 void TBrho_X(int N, int M, Iarray Map, Iarray MapOT, Iarray strideOT,
      Iarray NCmat, Iarray IF, Carray C, Carray rho)
 {
+
+/** Implementation using one particle jump mapping and double jump
+  * from the same orbital. For more detail about the arrays Map,
+  * MapOT and strideOT have a look in configurationsMap.h file **/
 
     int i, // int indices to number coeficients
         j,
@@ -972,6 +992,8 @@ void TBrho_XX(int N, int M, Iarray Map, Iarray MapOT, Iarray MapTT,
      Iarray strideOT, Iarray strideTT, Iarray NCmat, Iarray IF,
      Carray C, Carray rho)
 {
+
+/** Most improved implementation, using all maps **/
 
     int i, // int indices to number coeficients
         j,

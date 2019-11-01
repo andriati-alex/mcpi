@@ -5,6 +5,15 @@
 #include "configurationsMap.h"
 
 
+/****   AUTHOR INFORMATION
+
+ NAME : Alex Valerio Andriati
+ AFFILIATION : University of Sao Paulo - Brazil
+
+ Last update : 10/31/2019
+
+****/
+
 
 /* ========================================================================
  *
@@ -24,6 +33,9 @@
 
 void OBrho(int N, int M, Iarray NCmat, Carray C, Cmatrix rho)
 {
+
+/** The most naive implementation, without even the Hashing table
+  * of Fock states **/
 
     int i,
         j,
@@ -104,6 +116,10 @@ void OBrho(int N, int M, Iarray NCmat, Carray C, Cmatrix rho)
 void OBrho_X(int N, int M, Iarray NCmat, Iarray IF, Carray C, Cmatrix rho)
 {
 
+/** First basic improvement given by a predefined Hashing table in IF
+  * array, that means Index to Fock, see setupFocks routine in the
+  * configurationsMap.h file **/
+
     int i,
         j,
         k,
@@ -174,6 +190,10 @@ void OBrho_X(int N, int M, Iarray NCmat, Iarray IF, Carray C, Cmatrix rho)
 void OBrho_XM(int N, int M, Iarray Map, Iarray NCmat, Iarray IF,
      Carray C, Cmatrix rho)
 {
+
+/** Second improvement given by a Mapping structure between  configurations
+  * related by jump of a particle from one orbital to another, given in Map
+  * array. See OneOneMap routine in configurationsMap.h **/
 
     int i,
         j,

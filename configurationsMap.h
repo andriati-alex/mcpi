@@ -1,10 +1,18 @@
 #ifndef _configurationsMap_h
 #define _configurationsMap_h
 
+/****   AUTHOR INFORMATION
+ 
+ NAME : Alex Valerio Andriati
+ AFFILIATION : University of Sao Paulo - Brazil
+
+ Last update : 10/31/2019
+ 
+****/
+
 #include <complex.h>
 #include <stdlib.h>
 #include <stdio.h>
-
 
 // Vector of real numbers
 typedef double * Rarray;
@@ -118,12 +126,13 @@ int NC(int N, int M)
 Iarray setupNCmat(int N, int M)
 {
 
-/** Matrix of all possible outcomes form NC function with
-  * NCmat[i + N*j] = NC(i,j), where i < N and j < M,  the
+/** Matrix of all possible outcomes form NC function  with
+  * NCmat[i + N*j] = NC(i,j), where i <= N and j <= M, the
   * number of particles and states respectively.
   *
   * This is an auxiliar structure to avoid calls of  NC
-  * function many times when converting Fock states **/
+  * function many times when converting Fock states  to
+  * indexes **/
 
     int
         i,
@@ -167,7 +176,7 @@ void IndexToFock(int k, int N, int M, Iarray v)
     while ( k > 0 )
     {
         // Check if can 'pay' the cost to put  the  particle
-        // in current state. If not, try the a 'cheaper' one
+        // in current state. If not, try a 'cheaper' one
         while ( k - NC(N,m) < 0 ) m = m - 1;
 
         k = k - NC(N,m); // subtract cost
@@ -220,12 +229,13 @@ int FockToIndex(int N, int M, Iarray NCmat, Iarray v)
 Iarray setupFocks(int N, int M)
 {
 
-/** All possible occupation vectors in a vector. To get the occupations
-  * respect to configuration index k we  use  ItoFock[j + k*M]  with  j
-  * going from 0 to M - 1 (the state number).
+/** A hashing table for the Fock states ordering. Stores for each index
+  * of configurations the occupation numbers of the corresponding  Fock
+  * state, thus, replacing the usage of IndexToFock routine by a memory
+  * access.
   *
-  * This routine defines a hashing table which replace calls of
-  * IndexToFock routine **/
+  * ItoFock[j + k*M]  gives the occupation number of configuration k in
+  * the orbital j **/
 
     int
         k,
@@ -254,7 +264,7 @@ Iarray OneOneMap(int N, int M, Iarray NCmat, Iarray IF)
   * the occupation vector differs from the first by a jump of a particle
   * from one state to another.
   *
-  * Thus given the first index 'i' :
+  * Thus given the first index 'i' of a Fock state :
   *
   * Map[i + k * nc + l * nc * M] = index of another Fock state which
   * have one particle less in k that has been added in l         **/
@@ -320,10 +330,10 @@ Iarray allocTwoTwoMap(int nc, int M, Iarray IF)
   * whose the occupation numbers are related by jumps of  2 particles
   * from different individual particle states
   *
-  * Given an non-empty orbital k, look for the next non-empty s > k.
+  * Given an non-empty orbital k, look for the next non-empty s > k
   * When found such a combination, it is necessary to allocate  M^2
-  * new elements corresponding to the particles destiny, when removed
-  * from orbitals k and s **/
+  * new elements corresponding to the particles destiny, those that
+  * were removed from states k and s  **/
 
     int
         i,
@@ -366,23 +376,24 @@ Iarray allocTwoTwoMap(int nc, int M, Iarray IF)
 Iarray TwoTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
 {
 
-/** From one configuration find another by removing one particle in two
-  * different states and adding two in other two arbitrary  states.  To
-  * build such a structure in a vector of integers  it  looks  in  each
-  * configuration how many different possibilities  are  to  remove two
-  * particles from two different states, and for  each time  it happens
-  * there are M^2 different places to put those  particles.  Thus  this
-  * function also has as output the last argument, vector strideC which
-  * for each  enumerated configuration  i  store the integer number,  a
-  * index of the mapping where those possibilites to remove two particle
-  * starts.
+/** Structure to direct map a configuration to another by replacing
+  * particle from two different orbitals. To build such a structure
+  * in a vector of integers it looks in each configuration how many
+  * different possibilities are to remove two particles  from  two
+  * different states, and for  each time  it happens there are M^2
+  * different places to put those particles. Thus this function also
+  * has as output the last argument, vector strideC which  for  each
+  * enumerated configuration i store the integer number, a index  of
+  * the mapping where those possibilites to remove two particle starts.
   *
   * EXAMPLE : Given a configuration i, find configuration j which has
   * a particle less in states 'k' ans 's' (s > k),  and  two  more on
   * states 'q' and 'l'.
   *
-  * SOL : Using the map returned by this structure we start by the
-  * stride from the configuration i, so,
+  * SOL : Using the map returned by this structure we start  by  the
+  * stride from the configuration i, excluding the mapped index from
+  * all previous configurations. Then, walk in chunks of size M^2 until
+  * reach the orbitals desired to remove the particles.
   *
   * m = strideC[i];
   *
@@ -410,8 +421,7 @@ Iarray TwoTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
   *
   * m = q + l * M;
   *
-  * j = MapTT[m];
-**/
+  * j = MapTT[m]; **/
 
     int
         i,
@@ -485,13 +495,17 @@ Iarray TwoTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
                 }
 
                 // New chunk set up. Update how many chunks have been done
-                chunksO++;
-                chunksC++;
+                chunksO++; // for current configuration
+                chunksC++; // at all
             }
         }
     }
 
     free(occ);
+
+    // the final size of this mapping is given by the strideC[nc-1], since
+    // the last configuration cannot have a double jump of particles  from
+    // two different states.
 
     return Map;
 }
@@ -500,6 +514,15 @@ Iarray TwoTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
 
 Iarray allocOneTwoMap(int nc, int M, Iarray IF)
 {
+
+/** Analogously to allocTwoTwoMap create a structure for mapping between
+  * two different Fock states, though here the occupation numbers are
+  * related by jumps of 2 particles from the same orbital
+  *
+  * Given an orbital k that has at least 2 particles of a  configuration
+  * there are M^2 possible orbitals to put these particle removed from k
+  * For each time it happens among all configurations add a chunck of M^2
+  * elements to the total size of the mapping array **/
 
     int
         i,
@@ -536,30 +559,25 @@ Iarray allocOneTwoMap(int nc, int M, Iarray IF)
 Iarray OneTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
 {
 
-/** From one configuration find another by removing two particle from a
-  * state and adding two in other two arbitrary states. The strategy to
-  * store the index of these transition between the states are  similar
-  * to the described in TwoTwoMap function, but a bit more simpler.
+/** Configure the mapping array of jump of 2 particle from the same orbital.
+  * In contrast to the TwoTwoMap, for each configuration, for each orbital
+  * that has more than 2 particles, store the index of configurations with
+  * all possible destinies for the 2 removed particles.
   *
   * EXAMPLE : Given a configuration i, find configuration j which has
-  * a two particle less in state 'k' and 's' (s > k), and place  them
-  * in states 'q' and 'l'
+  * two particle less in state 'k', and place them in states 'q' and 'l'
   *
   * m = strideC[i];
   *
   * for h = 0 ... k - 1
   * {
-  *     if occupation on h and g are greater than 2 then
+  *     if occupation on h are greater than 2 then
   *     {
   *         m = m + M * M;
   *     }
   * }
   *
-  * j = MapTT[m + q + l*M];
-  *
-  * -------------------------------------------------------------------------
-  *
-  */
+  * j = MapTT[m + q + l*M]; **/
 
     int
         i,
@@ -586,6 +604,7 @@ Iarray OneTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
     for (i = 0; i < nc; i++)
     {
 
+        // stride for where the transitions of configuration i starts
         strideC[i] = chunksC * M * M;
 
         // Copy the occupation vector from C[i] coeff.
@@ -599,6 +618,7 @@ Iarray OneTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
             // Must be able to remove two particles
             if (occ[k] < 2) continue;
 
+            // jump a stride of previous transitions in this same conf.
             strideO = chunksO * M * M;
 
             for (l = 0; l < M; l++)
@@ -623,6 +643,11 @@ Iarray OneTwoMap(int N, int M, Iarray NCmat, Iarray IF, Iarray strideC)
     }
 
     free(occ);
+
+    // The size of this mapping array is given by strideC[nc-1]  plus the
+    // number of possible double jumps from the last configurations. From
+    // the last configuration we can only remove particles from the  last
+    // orbital, them the total size is strideC[nc-1] + M^2
 
     return Map;
 }

@@ -2,22 +2,28 @@
 /****   AUTHOR INFORMATION
  
  NAME : Alex Valerio Andriati
- AFFILIATION : University of São Paulo - Brazil
+ AFFILIATION : University of Sao Paulo - Brazil
 
- Last update : 08/13/2019
+ Last update : 10/31/2019
 
  -------------------------------------------------------------------------
 
  ****  TEST ROUTINES TO COMPUTE PHYSICAL OPERATORS
  *
- * compile :
+ * COMPILE :
  *
  * icc performanceTest.c -lm -o exe (if available)
  * gcc performanceText.c -lm -o exe
  *
+ * HOW TO EXECUTE :
+ *
  * ./exe Nparticles Norbitals
  *
- * produces several output .dat files for each available implementation
+ * where Nparticles and Morbitals are command line arguments for the
+ * number of particles and individual particle states respectively.
+ *
+ * Print on screen the time required by each implementation mentioned
+ * in the article
  *
  * ----------------------------------------------------------------------- */
 
