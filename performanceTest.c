@@ -4,7 +4,7 @@
  NAME : Alex Valerio Andriati
  AFFILIATION : University of Sao Paulo - Brazil
 
- Last update : 10/31/2019
+ Last update : November/02/2019
 
  -------------------------------------------------------------------------
 
@@ -12,8 +12,8 @@
  *
  * COMPILE :
  *
- * icc performanceTest.c -lm -o exe (if available)
- * gcc performanceText.c -lm -o exe
+ * icc performanceTest.c -lm -qopenmp -o exe (if available)
+ * gcc performanceText.c -lm -fopenmp -o exe
  *
  * HOW TO EXECUTE :
  *
@@ -21,9 +21,9 @@
  *
  * where Nparticles and Morbitals are command line arguments for the
  * number of particles and individual particle states respectively.
- *
- * Print on screen the time required by each implementation mentioned
- * in the article
+ * Execute each routine to compute density matrices and apply  the
+ * Hamiltonian using different improvements and display the result
+ * on screen.
  *
  * ----------------------------------------------------------------------- */
 
@@ -38,6 +38,9 @@
 int main(int argc, char * argv[])
 {
 
+    /*** NUMBER OF THREADS USED - CHOOSE ACCORDINGLY TO CPU LIMITS ***/
+    omp_set_num_threads(2);
+
     int
         i,
         j,
@@ -45,10 +48,13 @@ int main(int argc, char * argv[])
         l,
         nc,
         Npar,
-        Morb;
+        Morb,
+        nthreads;
 
     double
         sum,
+        end_omp,
+        start_omp,
         time_used;
 
     double complex
@@ -90,6 +96,8 @@ int main(int argc, char * argv[])
         exit(EXIT_FAILURE);
     }
 
+    nthreads = omp_get_max_threads();
+
     sscanf(argv[1],"%d",&Npar);
     sscanf(argv[2],"%d",&Morb);
     nc = NC(Npar,Morb);
@@ -111,7 +119,7 @@ int main(int argc, char * argv[])
     printf("\nMemory for Fock states : %.1lf",
             ((double) nc*Morb*sizeof(int)) / 1E6);
 
-    printf("\nMemory for one to one Map : %.1lf",
+    printf("\nMemory for single jump from one orbital(1J1O) : %.1lf",
             ((double) nc*Morb*Morb*sizeof(int)) / 1E6);
 
 
@@ -122,13 +130,10 @@ int main(int argc, char * argv[])
     MapTT = TwoTwoMap(Npar,Morb,NCmat,IFmat,strideTT);
     MapOT = OneTwoMap(Npar,Morb,NCmat,IFmat,strideOT);
 
-    printf("\nMemory for one-two Map : %.1lf",
+    printf("\nMemory for double jump from one orbital(2J1O) : %.1lf",
             ((double) strideOT[nc-1]*sizeof(int))/1E6);
-    printf("\nMemory for two-two Map : %.1lf",
+    printf("\nMemory for double jump from two orbitals(2J2O) : %.1lf",
             ((double) strideTT[nc-1]*sizeof(int))/1E6);
-
-    printf("\nMemory for two-body matrix elements : %.1lf",
-            ((double) Morb*Morb*Morb*Morb*sizeof(double complex))/1E6);
 
 
 
@@ -226,14 +231,14 @@ int main(int argc, char * argv[])
     for (i = 0; i < 50; i++) OBrho_X(Npar,Morb,NCmat,IFmat,C,rho1_X);
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 50;
-    printf("\n\nTime to setup rho1 with Fock states");
+    printf("\n\nTime to setup rho1");
     printf(" : %.3lfms", time_used * 1000);
 
     start = clock();
     for (i = 0; i < 50; i++) OBrho_XM(Npar,Morb,Map,NCmat,IFmat,C,rho1_XM);
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 50;
-    printf("\n\nTime to setup rho1 using Maps and Fock states");
+    printf("\n\nTime to setup rho1 using 1J1O mapping");
     printf(" : %.3lfms", time_used * 1000);
 
     start = clock();
@@ -249,7 +254,8 @@ int main(int argc, char * argv[])
     }
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;
-    printf("\n\nTime to setup rho2 with one-map : %.3lfms", time_used * 1000);
+    printf("\n\nTime to setup rho2 with 1J1O/2J1O mapping : ");
+    printf("%.3lfms", time_used * 1000);
 
     start = clock();
     for (i = 0; i < 5; i++)
@@ -259,13 +265,14 @@ int main(int argc, char * argv[])
     }
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;
-    printf("\n\nTime to setup rho2 with two-map : %.3lfms", time_used * 1000);
+    printf("\n\nTime to setup rho2 with all mappings : ");
+    printf("%.3lfms", time_used * 1000);
 
     start = clock();
     for (i = 0; i < 5; i++) applyHconf(Npar,Morb,NCmat,IFmat,C,Ho,Hint,out);
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;
-    printf("\n\nTime to apply H with no map : %.3lfms", time_used * 1000);
+    printf("\n\nTime to apply H : %.3lfms", time_used * 1000);
 
     start = clock();
     for (i = 0; i < 5; i++)
@@ -274,7 +281,8 @@ int main(int argc, char * argv[])
     }
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;
-    printf("\n\nTime to apply H with one-map : %.3lfms", time_used * 1000);
+    printf("\n\nTime to apply H with 1J1O/2J1O mapping : ");
+    printf("%.3lfms", time_used * 1000);
 
     start = clock();
     for (i = 0; i < 5; i++)
@@ -284,7 +292,25 @@ int main(int argc, char * argv[])
     }
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;
-    printf("\n\nTime to apply H with two-map : %.3lfms", time_used * 1000);
+    printf("\n\nTime to apply H with all mappings : ");
+    printf("%.3lfms", time_used * 1000);
+
+
+    // Parallelized routine
+    time_used = 0;
+    for (i = 0; i < 5; i++)
+    {
+        start_omp = omp_get_wtime();
+        applyHconf_omp(Npar,Morb,Map,MapOT,MapTT,strideOT,strideTT,
+                IFmat,C,Ho,Hint,out);
+        end_omp = omp_get_wtime();
+        time_used = time_used + ((double) (end_omp - start_omp));
+    }
+    time_used = time_used / 5;
+    printf("\n\nTime to apply H with all mappings(%d threads) : ",nthreads);
+    printf("%.3lfms", time_used * 1000);
+
+/** TO RECORD OUTPUT DATA UNCOMMENT THE FOLLOWING LINES
 
     cmat_txt("rho1_X.dat",Morb,Morb,rho1_X);
     cmat_txt("rho1_XM.dat",Morb,Morb,rho1_XM);
@@ -296,6 +322,8 @@ int main(int argc, char * argv[])
     carr_txt("C.dat",nc,out);
     carr_txt("C_X.dat",nc,out_X);
     carr_txt("C_XM.dat",nc,out_XX);
+
+**/
 
 
 

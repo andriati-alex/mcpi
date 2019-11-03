@@ -3,7 +3,7 @@
  NAME : Alex Valerio Andriati
  AFFILIATION : University of São Paulo - Brazil
 
- Last update : 08/13/2019
+ Last update : November/02/2019
 
 ---------------------------------------------------------------------------
 
@@ -12,16 +12,36 @@
  * compilation :
  * -------------
  *
- * icc timeMeasure.c -lm -o exe (if available)
- * gcc timeMeasure.c -lm -o exe
+ * icc timeMeasure.c -lm -qopenmp -o exe (if available)
+ * gcc timeMeasure.c -lm -fopenmp -o exe
  *
  * comments :
  * ----------
  *
- *  This executable record time demanded in each routine varying the number
- *  of particles in the system. It can be also used to sweep the number of
- *  single particle states with simple changes in the first for loop by
- *  allowing 'Morb' to vary and set Npar fixed.
+ * On execution, call routines to compute density matrices and apply the
+ * hamiltonian matrix in the Fock space, exploring various improvements,
+ * varying the size of the configurational space through the  number of
+ * particles or number of individual particle states. The time demanded
+ * by the different implementations are recorded 'time_used.dat'  file,
+ * measured im miliseconds. The output file data is organized as follows
+ *
+ * column 1 : Number of particles
+ * column 2 : Number of orbitals
+ * ---------------------------------- TIME ------------------------------
+ * column 3 : one-body density matrix both routines
+ * column 4 : one-body density matrix hashing table
+ * column 5 : one-body density matrix mappings
+ * column 6 : two-body density matrix hashing table
+ * column 7 : two-body density matrix jumps from one orbital mappings
+ * column 8 : two-body density matrix jumps from two orbitals mappings
+ * column 9 : Apply Hamiltonian with hashing table
+ * column 10 : Apply Hamiltonian with jumps from one orbital mappings
+ * column 11 : Apply Hamiltonian with jumps from two orbitals mappings
+ *
+ * The time for each of these routines is the average of 10 runs and
+ * additionaly a file with the standart deviation is supplied
+ *
+ * OBS.: Time is measured using clock() function from time.h library
  *
  * ----------------------------------------------------------------------- */
 
@@ -91,9 +111,14 @@ int main(int argc, char * argv[])
     times = fopen("time_used.dat", "w");
     times_std = fopen("time_std.dat", "w");
 
+/** COLLECT TIME VARYING CONFIGURATIONAL PARAMETER, NUMBER OF  PARTICLES
+  * OR NUMBER OF INDIVIDUAL PARTICLE STATES. TO SWITCH WICH PARAMETER IS
+  * FIXED WITH THE ONE IS BEING VARIED, JUST SWAP THE PLACES  OF  'Npar'
+  * AND 'Morb' VARIABLES IN THE NEXT TWO LINES                       **/
+
     Morb = 3;
 
-    for (Npar = 30; Npar < 1050; Npar += 50)
+    for (Npar = 30; Npar < 105; Npar += 50)
     {
 
         printf("\n\n");
@@ -109,34 +134,11 @@ int main(int argc, char * argv[])
 
         printf("\n\n======================================\n\n");
 
-        printf("MEMORY CONSUMPTION (in Mb)");
-
-        printf("\n\nMemory for coefficients : %.1lf",
-                ((double) nc*sizeof(double complex)) / 1E6);
-
-        printf("\nMemory for Fock states : %.1lf",
-                ((double) nc*Morb*sizeof(int)) / 1E6);
-
-        printf("\nMemory for one to one Map : %.1lf",
-                ((double) nc*Morb*Morb*sizeof(int)) / 1E6);
-
-
-
         strideTT = iarrDef(nc);
         strideOT = iarrDef(nc);
         Map = OneOneMap(Npar,Morb,NCmat,IFmat);
         MapTT = TwoTwoMap(Npar,Morb,NCmat,IFmat,strideTT);
         MapOT = OneTwoMap(Npar,Morb,NCmat,IFmat,strideOT);
-
-        printf("\nMemory for one-two Map : %.1lf",
-                ((double) strideOT[nc-1]*sizeof(int))/1E6);
-        printf("\nMemory for two-two Map : %.1lf",
-                ((double) strideTT[nc-1]*sizeof(int))/1E6);
-
-        printf("\nMemory for two-body matrix elements : %.1lf",
-                ((double) Morb*Morb*Morb*Morb*sizeof(double complex))/1E6);
-
-
 
         rho1 = (double complex **) malloc(Morb * sizeof(double complex *));
         for (i = 0; i < Morb; i++)
@@ -224,10 +226,6 @@ int main(int argc, char * argv[])
                 }
             }
         }
-
-
-
-        printf("\n\n======================================\n\n");
 
         printf("TIME DEMANDED");
 

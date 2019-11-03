@@ -3,7 +3,7 @@
  NAME : Alex Valerio Andriati
  AFFILIATION : University of São Paulo - Brazil
 
- Last update : 08/13/2019
+ Last update : November/02/2019
 
 ---------------------------------------------------------------------------
 
@@ -12,16 +12,21 @@
  * compilation :
  * -------------
  *
- * icc timeMeasure.c -lm -o exe (if available)
- * gcc timeMeasure.c -lm -o exe
+ * icc timeHomp.c -qopenmp -lm -o exe (if available)
+ * gcc timeHomp.c -fopenmp -lm -o exe
  *
  * comments :
  * ----------
  *
- *  This executable record time demanded in each routine varying the number
- *  of particles in the system. It can be also used to sweep the number of
- *  single particle states with simple changes in the first for loop by
- *  allowing 'Morb' to vary and set Npar fixed.
+ * On execution, call parallelized routine to apply the  hamiltonian on
+ * the coefficients of a state in Fock basis, varying the configuration
+ * space. The result is recorded in 'time_used_omp.dat'  file where the
+ * first column is the number of particles, the second is the number of
+ * orbitals and the third the average time demanded by the routine in
+ * 10 runs in miliseconds. Additionally another file with the  standart
+ * deviation of the runs is recorded as well
+ *
+ * OBS.: Time is measured using 'omp_get_wtime()' routine
  *
  * ----------------------------------------------------------------------- */
 
@@ -33,7 +38,8 @@
 int main(int argc, char * argv[])
 {
 
-    omp_set_num_threads(8);
+    /*** NUMBER OF THREADS USED ***/
+    omp_set_num_threads(2);
 
     int
         i,
@@ -79,12 +85,18 @@ int main(int argc, char * argv[])
         Ho;
 
     // record time and fluctuations by standart deviation
-    times = fopen("time_used_omp_orb.dat", "w");
-    times_std = fopen("time_std_omp_orb.dat", "w");
+    times = fopen("time_used_omp.dat", "w");
+    times_std = fopen("time_std_omp.dat", "w");
+
+
+/** COLLECT TIME VARYING CONFIGURATIONAL PARAMETER, NUMBER OF  PARTICLES
+  * OR NUMBER OF INDIVIDUAL PARTICLE STATES. TO SWITCH WICH PARAMETER IS
+  * FIXED WITH THE ONE IS BEING VARIED, JUST SWAP THE PLACES  OF  'Npar'
+  * AND 'Morb' VARIABLES IN THE NEXT TWO LINES                       **/
 
     Npar = 5;
 
-    for (Morb = 4; Morb < 26; Morb++)
+    for (Morb = 4; Morb < 12; Morb++)
     {
 
         printf("\n\n");
@@ -100,34 +112,11 @@ int main(int argc, char * argv[])
 
         printf("\n\n======================================\n\n");
 
-        printf("MEMORY CONSUMPTION (in Mb)");
-
-        printf("\n\nMemory for coefficients : %.1lf",
-                ((double) nc*sizeof(double complex)) / 1E6);
-
-        printf("\nMemory for Fock states : %.1lf",
-                ((double) nc*Morb*sizeof(int)) / 1E6);
-
-        printf("\nMemory for one to one Map : %.1lf",
-                ((double) nc*Morb*Morb*sizeof(int)) / 1E6);
-
-
-
         strideTT = iarrDef(nc);
         strideOT = iarrDef(nc);
         Map = OneOneMap(Npar,Morb,NCmat,IFmat);
         MapTT = TwoTwoMap(Npar,Morb,NCmat,IFmat,strideTT);
         MapOT = OneTwoMap(Npar,Morb,NCmat,IFmat,strideOT);
-
-        printf("\nMemory for one-two Map : %.1lf",
-                ((double) strideOT[nc-1]*sizeof(int))/1E6);
-        printf("\nMemory for two-two Map : %.1lf",
-                ((double) strideTT[nc-1]*sizeof(int))/1E6);
-
-        printf("\nMemory for two-body matrix elements : %.1lf",
-                ((double) Morb*Morb*Morb*Morb*sizeof(double complex))/1E6);
-
-
 
         Ho = (double complex **) malloc(Morb * sizeof(double complex *));
         for (i = 0; i < Morb; i++)
@@ -193,12 +182,6 @@ int main(int argc, char * argv[])
             }
         }
 
-
-
-        printf("\n\n======================================\n\n");
-
-        printf("TIME DEMANDED");
-
         fprintf(times,"%d  ",Npar);
         fprintf(times,"%d  ",Morb);
         fprintf(times_std,"%d  ",Npar);
@@ -208,7 +191,7 @@ int main(int argc, char * argv[])
         for (i = 0; i < 10; i++)
         {
             start = omp_get_wtime();
-            applyHconf_XX(Npar,Morb,Map,MapOT,MapTT,strideOT,strideTT,
+            applyHconf_omp(Npar,Morb,Map,MapOT,MapTT,strideOT,strideTT,
                     IFmat,C,Ho,Hint,out);
             end = omp_get_wtime();
             t[i] = ((double) (end - start));
@@ -223,7 +206,7 @@ int main(int argc, char * argv[])
         }
         time_std = sqrt(time_std / 10);
 
-        printf("\n\nTime to apply H with two-map : (%.3lf +- %.4lf)ms",
+        printf("Time demanded : (%.3lf +- %.4lf)ms \n\n",
                 time_used * 1000, time_std * 1000);
 
         fprintf(times, "%.6lf  ", time_used * 1000);

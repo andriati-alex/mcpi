@@ -6,7 +6,16 @@
  NAME : Alex Valerio Andriati
  AFFILIATION : University of Sao Paulo - Brazil
 
- Last update : 10/31/2019
+ Last update : November/02/2019
+
+----------------------------------------------------------------------------
+
+ COMMENTS
+
+ Basic routines to setup a multiconfiguration problem, going from simple
+ factorial to the complicated mappings to improve computations involving
+ action of creation/destruction operators. To check out simple application
+ of the present routines try the 'demonstrateFockMap.c' program
  
 ****/
 

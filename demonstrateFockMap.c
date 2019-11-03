@@ -4,7 +4,7 @@
  NAME : Alex Valerio Andriati
  AFFILIATION : University of São Paulo - Brazil
 
- Last update : 10/31/2019
+ Last update : November/02/2019
 
 ---------------------------------------------------------------------------
 
@@ -24,12 +24,14 @@
  *
  * First command line argument is the number of particles and  the second
  * is the number of orbitals. It prints on the screen all the Fock states
- * enumerated, that is the hashing table. Moreover it shows the  mappings
+ * enumerated, that is, the hashing table. Moreover it shows the mappings
  * for some cases
  *
- * NOTE : this is suppose to be a simple demonstration, then do not use
- * large number of particles or orbitals because it would mess up the
- * output on the screen. **/
+ * IMPORTANT NOTE : this is suppose to be a simple demonstration, then do
+ * not use large number of particles or orbitals because it would mess up
+ * the output on the screen
+ *
+--------------------------------------------------------------------------- **/
 
 
 
@@ -95,9 +97,10 @@ int main(int argc, char * argv[])
     MapTT = TwoTwoMap(Npar,Morb,NCmat,IFmat,stridesTT);
     MapOT = OneTwoMap(Npar,Morb,NCmat,IFmat,stridesOT);
 
-    printf("\nSize of one to one jump map : %d", nc * Morb * Morb);
-    printf("\nSize of two to two jump map : %d", stridesTT[nc-1]);
-    printf("\nSize of one to two jump map : %d", stridesOT[nc-1] + Morb*Morb);
+    printf("\nSize single jump from 1 orbital map : %d", nc * Morb * Morb);
+    printf("\nSize double jump from 1 orbital map : %d",
+            stridesOT[nc-1] + Morb*Morb);
+    printf("\nSize double jump from 2 orbitals map : %d", stridesTT[nc-1]);
 
     printf("\n\n\n");
 
@@ -111,7 +114,7 @@ int main(int argc, char * argv[])
         for (i = 0; i < Morb - 1; i++) printf(" Orb%d ,",i + 1);
         printf(" Orb%d ]", Morb);
 
-        printf("    Transitions : from -> to\n");
+        printf("    Jump of one particle\n");
 
         printf("=============================================");
         printf("================================");
@@ -126,16 +129,22 @@ int main(int argc, char * argv[])
             k = FockToIndex(Npar,Morb,NCmat,&IFmat[Morb*i]);
             if (k != i)
             {
+                // Self consistency check, if the Fock state in the
+                // hashing table that was constructed using IndexToFock
+                // function gives the correc index when converted back
                 printf("\n\nERROR: Wrong map from FockToIndex\n\n");
             }
 
             k = i % Morb;
             j = (2 * i / 3 + 1) % Morb;
-            printf("    %d -> %d", k + 1, j + 1);
-            printf(" index = %4d",Map[i+k*nc+j*nc*Morb]);
+            if (Map[i+k*nc+j*nc*Morb] >= 0)
+            {
+                printf("    %d -> %d", k + 1, j + 1);
+                printf(" index = %4d",Map[i+k*nc+j*nc*Morb]);
+            }
         }
 
-        printf("\n\n\nDouble transitions from different orbitals.\n\n");
+        printf("\n\n\nDouble jump from 2 orbitals.\n\n");
         printf("=============================================");
         printf("================================\n\n");
 
@@ -182,7 +191,7 @@ int main(int argc, char * argv[])
 
 
 
-        printf("\n\n\nDouble transitions from the same orbital.\n\n");
+        printf("\n\n\nDouble jump from the same orbital.\n\n");
         printf("=============================================");
         printf("================================\n\n");
 
@@ -222,7 +231,7 @@ int main(int argc, char * argv[])
     else
     {
         printf("\n\nWARNING : Not printing, too large system with ");
-        printf("total number of combinations higher than 10000\n");
+        printf("total number of configurations higher than 10000\n");
     }
 
 

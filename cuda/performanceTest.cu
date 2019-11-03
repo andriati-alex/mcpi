@@ -1,3 +1,31 @@
+
+/****   AUTHOR INFORMATION
+ 
+ NAME : Alex Valerio Andriati
+ AFFILIATION : University of Sao Paulo - Brazil
+
+ Last update : November/02/2019
+
+ -------------------------------------------------------------------------
+
+ ****  TEST ROUTINES TO COMPUTE PHYSICAL OPERATORS
+ *
+ * COMPILE :
+ *
+ * nvcc performanceTest.c -o exe
+ *
+ * HOW TO EXECUTE :
+ *
+ * ./exe Nparticles Norbitals
+ *
+ * where 'Nparticles' and 'Morbitals' are command line arguments for the
+ * number of particles and individual particle states respectively.
+ *
+ * In order to measure time one may use the command nvproof before ./exe
+ * For more information check out CUDA developer guide
+ *
+ * ----------------------------------------------------------------------- */
+
 #include "hamiltonianMatrix.cuh"
 #include "outTextFile.h"
 
@@ -166,16 +194,13 @@ int main(int argc, char * argv[])
     printf("\nMemory for Fock states : %.1lf",
             ((double) nc*Morb*sizeof(int)) / 1E6);
 
-    printf("\nMemory for one to one Map : %.1lf",
+    printf("\nMemory for single jump from 1 orbital Map : %.1lf",
             ((double) nc*Morb*Morb*sizeof(int)) / 1E6);
 
-    printf("\nMemory for one-two Map : %.1lf",
+    printf("\nMemory for double jump from 1 orbital Map : %.1lf",
             ((double) strideOT[nc-1]*sizeof(int))/1E6);
-    printf("\nMemory for two-two Map : %.1lf",
+    printf("\nMemory for double jump from 2 orbitals Map : %.1lf",
             ((double) strideTT[nc-1]*sizeof(int))/1E6);
-
-    printf("\nMemory for two-body matrix elements : %.1lf",
-            ((double) 2*Morb*Morb*Morb*Morb*sizeof(double))/1E6);
 
 
 
@@ -293,7 +318,7 @@ int main(int argc, char * argv[])
     // optimally choose the number of blocks
     blocks = (nc + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
-    for (i = 0; i < 15; i++)
+    for (i = 0; i < 5; i++)
     {
         applyHconf<<<blocks,THREADS_PER_BLOCK>>>(Npar,Morb,d_Map,d_MapOT,d_MapTT,
             d_strideOT,d_strideTT,d_IFmat,d_C,d_Ho,d_Hint,d_out);

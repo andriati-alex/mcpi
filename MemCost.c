@@ -4,7 +4,7 @@
  NAME : Alex Valerio Andriati
  AFFILIATION : University of São Paulo - Brazil
 
- Last update : 08/13/2019
+ Last update : November/02/2019
 
 ---------------------------------------------------------------------------
 
@@ -19,16 +19,26 @@
  * comments :
  * ----------
  *
- *  On executing this program it will compute the memory for all  required
- *  structures for each improvement done, sweeping the number of particles.
+ * Compute the memory cost of the several data structures used  in
+ * improvement of routines to compute the density matrices and the
+ * Hamiltonian action on configuration  space.  Vary the number of
+ * particles or the number of individual particle states and record
+ * the results in 'mem_used.dat' file. The layout of the output
+ * file has the following structure
+ *
+ * column 1 : Number of particles
+ * column 2 : Number of orbitals
+ * ------------------------------- Memory -------------------------------
+ * column 3 : Coefficients storage
+ * column 4 : Hashing table
+ * column 5 : Mapping of single Jump from one orbital (1J1O)
+ * column 6 : Mapping of double Jump from one orbital (2J1O)
+ * column 7 : Mapping of double jump from two different orbitals (2J2O)
  *
  * ----------------------------------------------------------------------- */
 
-#include "onebodyMatrix.h"
-#include "twobodyMatrix.h"
-#include "hamiltonianMatrix.h"
+#include "configurationsMap.h"
 #include "outTextFile.h"
-#include <time.h>
 
 
 
@@ -61,9 +71,14 @@ int main(int argc, char * argv[])
 
     output = fopen("mem_used.dat", "w");
 
+/** COLLECT TIME VARYING CONFIGURATIONAL PARAMETER, NUMBER OF  PARTICLES
+  * OR NUMBER OF INDIVIDUAL PARTICLE STATES. TO SWITCH WICH PARAMETER IS
+  * FIXED WITH THE ONE IS BEING VARIED, JUST SWAP THE PLACES  OF  'Npar'
+  * AND 'Morb' VARIABLES IN THE NEXT TWO LINES                       **/
+
     Morb = 3;
 
-    for (Npar = 30; Npar < 1050; Npar += 50)
+    for (Npar = 900; Npar < 951; Npar += 50)
     {
 
         printf("\n\n");
@@ -93,15 +108,15 @@ int main(int argc, char * argv[])
 
         printf("MEMORY CONSUMPTION (in Mb)");
 
-        printf("\n\nMemory for coefficients : %.1lf", Cmem);
+        printf("\n\nMemory for coefficients : %.3lf", Cmem);
 
-        printf("\nMemory for Fock states : %.1lf", IFmem);
+        printf("\nMemory for Fock states : %.3lf", IFmem);
 
-        printf("\nMemory for one to one Map : %.1lf", MAPmem);
+        printf("\nMemory single jump from one orbital map : %.3lf", MAPmem);
 
-        printf("\nMemory for one-two Map : %.1lf", MAPOTmem);
+        printf("\nMemory double jump from one orbital map : %.3lf", MAPOTmem);
 
-        printf("\nMemory for two-two Map : %.1lf", MAPTTmem);
+        printf("\nMemory double jump from two orbitals map : %.3lf", MAPTTmem);
 
         free(Map);
 
