@@ -310,21 +310,6 @@ int main(int argc, char * argv[])
     printf("\n\nTime to apply H with all mappings(%d threads) : ",nthreads);
     printf("%.3lfms", time_used * 1000);
 
-/** TO RECORD OUTPUT DATA UNCOMMENT THE FOLLOWING LINES
-
-    cmat_txt("rho1_X.dat",Morb,Morb,rho1_X);
-    cmat_txt("rho1_XM.dat",Morb,Morb,rho1_XM);
-
-    carr_txt("rho2.dat",Morb*Morb*Morb*Morb,rho2);
-    carr_txt("rho2_X.dat",Morb*Morb*Morb*Morb,rho2_X);
-    carr_txt("rho2_XM.dat",Morb*Morb*Morb*Morb,rho2_XM);
-
-    carr_txt("C.dat",nc,out);
-    carr_txt("C_X.dat",nc,out_X);
-    carr_txt("C_XM.dat",nc,out_XX);
-
-**/
-
 
 
     free(C);
