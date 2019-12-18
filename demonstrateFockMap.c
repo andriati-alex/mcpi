@@ -4,7 +4,7 @@
  NAME : Alex Valerio Andriati
  AFFILIATION : University of São Paulo - Brazil
 
- Last update : November/02/2019
+ Last update : December/18/2019
 
 ---------------------------------------------------------------------------
 
@@ -15,7 +15,7 @@
  *
  * COMPILATION :
  *
- * icc demonstrateFockMap.c -lm -o exe (if available)
+ * icc demonstrateFockMap.c -lm -o exe (if intel compiler is available)
  * gcc demonstrateFockMap.c -lm -o exe
  *
  * EXECUTION :
@@ -97,10 +97,12 @@ int main(int argc, char * argv[])
     MapTT = TwoTwoMap(Npar,Morb,NCmat,IFmat,stridesTT);
     MapOT = OneTwoMap(Npar,Morb,NCmat,IFmat,stridesOT);
 
-    printf("\nSize single jump from 1 orbital map : %d", nc * Morb * Morb);
-    printf("\nSize double jump from 1 orbital map : %d",
+    printf("\nSize single jump from 1 orbital map : %d integers",
+            nc*Morb*Morb);
+    printf("\nSize double jump from 1 orbital map : %d integers",
             stridesOT[nc-1] + Morb*Morb);
-    printf("\nSize double jump from 2 orbitals map : %d", stridesTT[nc-1]);
+    printf("\nSize double jump from 2 orbitals map : %d integers",
+            stridesTT[nc-1]);
 
     printf("\n\n\n");
 
@@ -244,6 +246,6 @@ int main(int argc, char * argv[])
     free(MapOT);
     free(stridesOT);
 
-    printf("\n\nDone.\n");
+    printf("\n\nDone.\n\n");
     return 0;
 }

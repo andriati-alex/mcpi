@@ -12,7 +12,7 @@
  *
  * COMPILE :
  *
- * icc performanceTest.c -lm -qopenmp -o exe (if available)
+ * icc performanceTest.c -lm -qopenmp -o exe (if intel compiler is available)
  * gcc performanceText.c -lm -fopenmp -o exe
  *
  * HOW TO EXECUTE :
@@ -116,7 +116,7 @@ int main(int argc, char * argv[])
     printf("\n\nMemory for coefficients : %.1lf",
             ((double) nc*sizeof(double complex)) / 1E6);
 
-    printf("\nMemory for Fock states : %.1lf",
+    printf("\nMemory for Hashing table : %.1lf",
             ((double) nc*Morb*sizeof(int)) / 1E6);
 
     printf("\nMemory for single jump from one orbital(1J1O) : %.1lf",
@@ -231,7 +231,7 @@ int main(int argc, char * argv[])
     for (i = 0; i < 50; i++) OBrho_X(Npar,Morb,NCmat,IFmat,C,rho1_X);
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 50;
-    printf("\n\nTime to setup rho1");
+    printf("\n\nTime to setup rho1 with hashing table");
     printf(" : %.3lfms", time_used * 1000);
 
     start = clock();
@@ -245,7 +245,8 @@ int main(int argc, char * argv[])
     for (i = 0; i < 5; i++) TBrho(Npar,Morb,NCmat,IFmat,C,rho2);
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;
-    printf("\n\nTime to setup rho2 : %.3lfms", time_used * 1000);
+    printf("\n\nTime to setup rho2 with hashing table");
+    printf(" : %.3lfms",time_used*1000);
 
     start = clock();
     for (i = 0; i < 5; i++)
@@ -272,7 +273,8 @@ int main(int argc, char * argv[])
     for (i = 0; i < 5; i++) applyHconf(Npar,Morb,NCmat,IFmat,C,Ho,Hint,out);
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;
-    printf("\n\nTime to apply H : %.3lfms", time_used * 1000);
+    printf("\n\nTime to apply H with Hashing Table");
+    printf(" : %.3lfms", time_used * 1000);
 
     start = clock();
     for (i = 0; i < 5; i++)
@@ -288,7 +290,7 @@ int main(int argc, char * argv[])
     for (i = 0; i < 5; i++)
     {
         applyHconf_XX(Npar,Morb,Map,MapOT,MapTT,strideOT,strideTT,
-                IFmat,C,Ho,Hint,out_XX);
+                      IFmat,C,Ho,Hint,out_XX);
     }
     end = clock();
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC / 5;
@@ -302,7 +304,7 @@ int main(int argc, char * argv[])
     {
         start_omp = omp_get_wtime();
         applyHconf_omp(Npar,Morb,Map,MapOT,MapTT,strideOT,strideTT,
-                IFmat,C,Ho,Hint,out);
+                       IFmat,C,Ho,Hint,out);
         end_omp = omp_get_wtime();
         time_used = time_used + ((double) (end_omp - start_omp));
     }

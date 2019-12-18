@@ -27,7 +27,6 @@
  * ----------------------------------------------------------------------- */
 
 #include "hamiltonianMatrix.cuh"
-#include "outTextFile.h"
 
 
 
@@ -334,8 +333,6 @@ int main(int argc, char * argv[])
         printf(" error code : %s!\n\n", cudaGetErrorString(err));
         exit(EXIT_FAILURE);
     }
-
-    carr_txt("C.dat",nc,out);
 
     // free Host memory
     free(C);
