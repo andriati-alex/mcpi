@@ -30,7 +30,6 @@
 #include "onebodyMatrix.h"
 #include "twobodyMatrix.h"
 #include "hamiltonianMatrix.h"
-#include "outTextFile.h"
 #include <time.h>
 
 
