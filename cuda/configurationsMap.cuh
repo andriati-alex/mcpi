@@ -1,6 +1,7 @@
 #ifndef _configurationsMap_cuh
 #define _configurationsMap_cuh
 
+#include <limits.h>
 #include <cuda_runtime.h>
 #include <cuComplex.h>
 #include <stdlib.h>
@@ -158,14 +159,22 @@ void cuda_iarrDef(int n, Iarray * ptr_address)
 long fac(int n)
 {
     long
-        i;
-
-    long
+        i,
         nfac;
 
     nfac = 1;
 
-    for (i = 1; i < n; i++) nfac = nfac * (i + 1);
+    for (i = 1; i < n; i++)   
+    {
+        if (nfac > INT_MAX / (i + 1))
+        {
+            printf("\n\n\n\tINTEGER SIZE ERROR : overflow occurred");
+            printf(" representing a factorial as ");
+            printf("integers of 32 bits\n\n");
+            exit(EXIT_FAILURE);
+        }
+        nfac = nfac * (i + 1);
+    }
 
     return nfac;
 }
@@ -175,20 +184,60 @@ long fac(int n)
 int NC(int N, int M)
 {
 
+/** Number of Configurations(NC) of N particles in M states **/
+
     long
+        j,
         i,
         n;
 
     n = 1;
+    j = 2;
 
     if  (M > N)
     {
-        for (i = N + M - 1; i > M - 1; i --) n = n * i;
-        return (int) (n / fac(N));
+        for (i = N + M - 1; i > M - 1; i --)
+        {
+            if (n > INT_MAX / i)
+            {
+                printf("\n\n\nINTEGER SIZE ERROR : overflow occurred");
+                printf(" representing the number of configurations as ");
+                printf("integers of 32 bits\n\n");
+                exit(EXIT_FAILURE);
+            }
+            n = n * i;
+            if (n % j == 0 && j <= N)
+            {
+                n = n / j;
+                j = j + 1;
+            }
+        }
+
+        for (i = j; i < N + 1; i++) n = n / i;
+
+        return ((int) n);
     }
 
-    for (i = N + M - 1; i > N; i --) n = n * i;
-    return (int) (n / fac(M - 1));
+    for (i = N + M - 1; i > N; i --)
+    {
+        if (n > INT_MAX / i)
+        {
+            printf("\n\n\nINTEGER SIZE ERROR : overflow occurred");
+            printf(" representing the number of configurations as ");
+            printf("integers of 32 bits\n\n");
+            exit(EXIT_FAILURE);
+        }
+        n = n * i;
+        if (n % j == 0 && j <= M - 1)
+        {
+            n = n / j;
+            j = j + 1;
+        }
+    }
+
+    for (i = j; i < M; i++) n = n / i;
+
+    return ((int) n);
 }
 
 
@@ -286,6 +335,14 @@ Iarray setupFocks(int N, int M)
         ItoFock;
 
     nc = NC(N,M);
+
+    if (nc > INT_MAX / M)
+    {
+        printf("\n\n\nMEMORY ERROR : Because of the size of the");
+        printf(" hashing table it can't be indexed by 32-bit integers\n\n");
+        exit(EXIT_FAILURE);
+    }
+
     ItoFock = iarrDef(nc * M);
 
     for (k = 0; k < nc; k++)
@@ -312,6 +369,13 @@ Iarray OneOneMap(int N, int M, Iarray NCmat, Iarray IF)
         Map;
 
     nc = NC(N,M);
+
+    if (nc > INT_MAX / M / M)
+    {
+        printf("\n\n\nMEMORY ERROR : Because of the size of the");
+        printf(" jump-mappings they can't be indexed by 32-bit integers\n\n");
+        exit(EXIT_FAILURE);
+    }
     
     v = iarrDef(M);
 
@@ -378,6 +442,13 @@ Iarray allocTwoTwoMap(int nc, int M, Iarray IF)
                 chunks++;
             }
         }
+    }
+
+    if (chunks > INT_MAX / M / M)
+    {
+        printf("\n\n\nMEMORY ERROR : Because of the size of the");
+        printf(" jump-mappings they can't be indexed by 32-bit integers\n\n");
+        exit(EXIT_FAILURE);
     }
 
     Map = iarrDef(chunks * M * M);
@@ -491,6 +562,13 @@ Iarray allocOneTwoMap(int nc, int M, Iarray IF)
             chunks++;
 
         }
+    }
+
+    if (chunks > INT_MAX / M / M)
+    {
+        printf("\n\n\nMEMORY ERROR : Because of the size of the");
+        printf(" jump-mappings they can't be indexed by 32-bit integers\n\n");
+        exit(EXIT_FAILURE);
     }
 
     Map = iarrDef(chunks * M * M);

@@ -4,21 +4,6 @@
 #include "configurationsMap.cuh"
 
 
-__device__
-void d_fac(int n, long * out)
-{
-    long
-        i,
-        nfac;
-
-    nfac = 1;
-
-    for (i = 1; i < n; i++) nfac = nfac * (i + 1);
-
-    *out = nfac;
-}
-
-
 
 __device__
 void d_NC(int N, int M, int * nc)
@@ -27,23 +12,46 @@ void d_NC(int N, int M, int * nc)
 /** Number of Configurations(NC) of N particles in M states **/
 
     long
+        j,
         i,
-        n,
-        fact;
+        n;
 
     n = 1;
+    j = 2;
 
     if  (M > N)
     {
-        for (i = N + M - 1; i > M - 1; i --) n = n * i;
-        d_fac(N,&fact);
-        *nc = (int) (n / fact);
+        for (i = N + M - 1; i > M - 1; i --)
+        {
+            n = n * i;
+            if (n % j == 0 && j <= N)
+            {
+                n = n / j;
+                j = j + 1;
+            }
+        }
+
+        for (i = j; i < N + 1; i++) n = n / i;
+
+        *nc = ((int) n);
     }
+
     else
     {
-        for (i = N + M - 1; i > N; i --) n = n * i;
-        d_fac(M-1,&fact);
-        *nc = (int) (n / fact);
+
+        for (i = N + M - 1; i > N; i --)
+        {
+            n = n * i;
+            if (n % j == 0 && j <= M - 1)
+            {
+                n = n / j;
+                j = j + 1;
+            }
+        }
+
+        for (i = j; i < M; i++) n = n / i;
+
+        *nc =  ((int) n);
     }
 }
 
