@@ -13,7 +13,7 @@
  * COMPILE :
  *
  * icc performanceTest.c -lm -qopenmp -o exe (if intel compiler is available)
- * gcc performanceText.c -lm -fopenmp -o exe
+ * gcc performanceTest.c -lm -fopenmp -o exe
  *
  * HOW TO EXECUTE :
  *
