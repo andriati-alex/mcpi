@@ -4,27 +4,61 @@
  NAME : Alex Valerio Andriati
  AFFILIATION : University of Sao Paulo - Brazil
 
- Last update : November/02/2019
+ Last update : February/03/2020
 
  -------------------------------------------------------------------------
 
- ****  TEST ROUTINES TO COMPUTE PHYSICAL OPERATORS
- *
+ ****  ROUTINE TO COMPUTE GROUND STATE ENERGY OF LIEB GAS
+
  * COMPILE :
- *
- * icc performanceTest.c -lm -qopenmp -o exe (if intel compiler is available)
- * gcc performanceTest.c -lm -fopenmp -o exe
- *
+ * ---------
+
+ * icc -o exe groundStateLieb.c \
+            -L${MKLROOT}/lib/intel64 \
+            -lmkl_intel_lp64 \
+            -lmkl_gnu_thread \
+            -lmkl_core \
+            -qopenmp \
+            -lgomp \
+            -O3 \
+
+ * gcc -o exe groundStateLieb.c \
+            -L${MKLROOT}/lib/intel64 \
+            -lmkl_intel_lp64 \
+            -lmkl_gnu_thread \
+            -lmkl_core \
+            -fopenmp \
+            -lgomp \
+            -lm \
+            -O3 \
+
+
+
  * HOW TO EXECUTE :
- *
+ * ----------------
+
  * ./exe Nparticles Norbitals
- *
+
  * where Nparticles and Morbitals are command line arguments for the
  * number of particles and individual particle states respectively.
- * Execute each routine to compute density matrices and apply  the
- * Hamiltonian using different improvements and display the result
- * on screen.
- *
+ * Perform 1/8 of the size of the configurational space as lanczos
+ * iterations.  To  compare  with the Fermi energy a odd number of
+ * particles is required to avoid degeneracy
+
+
+
+ * DEPENDENCIES :
+ * --------------
+
+ * It uses the routine  'dstev' from LAPACK package.  Here the compilation
+ * options are directed to Intel Math Kernel Library(MKL) distribution for
+ * Linux based systems. For other distributions of  LAPACK  or operational
+ * system one must search the correct way to link the libraries.
+ * More information on how to link libraries from Intel MKL are available:
+
+ https://software.intel.com/en-us/articles/intel-mkl-link-line-advisor
+ (last consulted on Feb/01/2020)
+
  * ----------------------------------------------------------------------- */
 
 #define PI 3.141592653589793
@@ -97,7 +131,8 @@ void setupHo(int Morb, double L, Cmatrix Ho)
 {
 
 /** Configure hamiltonian matrix using the individual particle states
-    The plane waves are eigenstates of the one-body hamiltonian   **/
+    The plane waves are eigenstates of the one-body hamiltonian, thus
+    the matrix is evaluated analytically **/
 
     int
         n,
@@ -126,7 +161,8 @@ void setupHint(int Morb, double g, Carray Hint)
 {
 
 /** Configure two-body hamiltonian matrix elements for contact interaction
-    using the plane waves as orbitals **/
+    using the plane waves as orbitals. From momentum conservation evaluate
+    the elements analytically **/
 
     int
         n,
@@ -218,6 +254,9 @@ int lanczos(int lm, int Npar, int Morb, Iarray IF, Iarray strideOT,
 
 
 
+    printf("\n\nCALLING LANCZOS ITERATIONS\n\n");
+    printf("-- Progress");
+
     // Check for a source of breakdown in the algorithm to do not
     // divide by zero. Instead of zero use  a  tolerance (tol) to
     // avoid numerical instability
@@ -271,6 +310,11 @@ int lanczos(int lm, int Npar, int Morb, Iarray IF, Iarray strideOT,
         for (j = 0; j < nc; j++)
         {
             for (k = 0; k < i + 2; k++) HC[j] -= lvec[k][j] * ortho[k];
+        }
+
+        if ( (i + 1) % 100 == 0 )
+        {
+            printf("\n  %5.1lf%%",(100.0*i)/(lm-1));
         }
     }
 
@@ -532,15 +576,13 @@ int main(int argc, char * argv[])
 
 
 
-    printf("\n\n======================================\n\n");
-
-    printf("TIME DEMANDED");
+    printf("\n\n======================================");
 
     time_used = 0;
 
     start_omp = omp_get_wtime();
 
-    Eo = ground(nc/4,Npar,Morb,IFmat,strideOT,strideTT,Map,MapOT,MapTT,Ho,Hint,C);
+    Eo = ground(nc/8,Npar,Morb,IFmat,strideOT,strideTT,Map,MapOT,MapTT,Ho,Hint,C);
 
     end_omp = omp_get_wtime();
     time_used = time_used + ((double) (end_omp - start_omp));
@@ -558,6 +600,7 @@ int main(int argc, char * argv[])
     printf("\n\ng = %.5lf | Eo = %.5lf | Efermi = %.5lf",g,Eo/Npar,Ef/Npar);
 
 
+    printf("\n\n======================================\n\n");
 
     free(x);
 
