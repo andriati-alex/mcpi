@@ -43,7 +43,7 @@ typedef int * Iarray;
 
 
 
-Rarray rarrDef(int n)
+Rarray rarrDef(unsigned int n)
 {
     double * ptr;
 
@@ -51,7 +51,7 @@ Rarray rarrDef(int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\n\tMEMORY ERROR : malloc fail for double\n\n");
+        printf("\n\n\nMEMORY ERROR : malloc fail for double\n\n");
         exit(EXIT_FAILURE);
     }
 
@@ -60,7 +60,7 @@ Rarray rarrDef(int n)
 
 
 
-Carray carrDef(int n)
+Carray carrDef(unsigned int n)
 {
     double complex * ptr;
 
@@ -68,7 +68,7 @@ Carray carrDef(int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\n\tMEMORY ERROR : malloc fail for complex\n\n");
+        printf("\n\n\nMEMORY ERROR : malloc fail for complex\n\n");
         exit(EXIT_FAILURE);
     }
 
@@ -77,7 +77,7 @@ Carray carrDef(int n)
 
 
 
-Iarray iarrDef(int n)
+Iarray iarrDef(unsigned int n)
 {
     int * ptr;
 
@@ -85,10 +85,32 @@ Iarray iarrDef(int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\n\tMEMORY ERROR : malloc fail for integer.");
+        printf("\n\n\nMEMORY ERROR : malloc fail for integer.");
         printf(" Size requested : %ld\n\n", n * sizeof(int));
         exit(EXIT_FAILURE);
     }
+
+    return ptr;
+}
+
+
+
+Cmatrix cmatDef(unsigned int m, unsigned int n)
+{
+
+    int i;
+
+    double complex ** ptr;
+
+    ptr = (double complex ** ) malloc( m * sizeof(double complex *) );
+
+    if (ptr == NULL)
+    {
+        printf("\n\n\nMEMORY ERROR : malloc fail for (complex *)\n\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (i = 0; i < m; i++) ptr[i] = carrDef(n);
 
     return ptr;
 }
