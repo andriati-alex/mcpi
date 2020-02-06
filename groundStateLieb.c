@@ -4,7 +4,7 @@
  NAME : Alex Valerio Andriati
  AFFILIATION : University of Sao Paulo - Brazil
 
- Last update : February/03/2020
+ Last update : February/06/2020
 
  -------------------------------------------------------------------------
 
@@ -37,12 +37,13 @@
  * HOW TO EXECUTE :
  * ----------------
 
- * ./exe Nparticles Norbitals
+ * ./exe Nparticles Norbitals g
 
  * where Nparticles and Morbitals are command line arguments for the
- * number of particles and individual particle states respectively.
- * Perform 1/8 of the size of the configurational space as lanczos
- * iterations.  To  compare  with the Fermi energy a odd number of
+ * number of particles and  individual particle states respectively,
+ * and g is the dimensionless contact interaction strength parameter
+ * Perform 1/8 of the size of the configurational  space  as lanczos
+ * iterations.  To  compare  with  the  Fermi energy a odd number of
  * particles is required to avoid degeneracy
 
 
@@ -471,7 +472,6 @@ int main(int argc, char * argv[])
         L,
         g,
         Eo,
-        Ef,
         dx,
         sum,
         end_omp,
@@ -503,24 +503,25 @@ int main(int argc, char * argv[])
 
     nthreads = omp_get_max_threads() / 2;
 
-    if (argc != 3)
+    if (argc != 4)
     {
         printf("\n\nERROR: Need two integer numbers from command line ");
         printf("the first number of particles and second the number of ");
-        printf("orbitals.\n\n");
+        printf("IPS and the interaction strength(float) : \n\n");
+        printf("./exe_name Npar Norb g\n\n");
         exit(EXIT_FAILURE);
     }
 
 
 
     // grid configuration of domain
-    g = 100.0;
     L = 1.0;
     Mpos = 1001;
     dx = L / (Mpos - 1);
 
     sscanf(argv[1],"%d",&Npar);
     sscanf(argv[2],"%d",&Morb);
+    sscanf(argv[3],"%lf",&g);
     nc = NC(Npar,Morb);
 
     printf("\nNumber of particles : %3d", Npar);
@@ -590,14 +591,7 @@ int main(int argc, char * argv[])
     printf("\n\nTime to find ground state(%d threads) : ",nthreads);
     printf("%.3lfs", time_used);
 
-    // Fermi Energy
-    Ef = 0;
-    for (i = 1; i <= Npar/2; i++)
-    {
-        Ef = Ef + (2 * PI * i / L) * (2 * PI * i / L);
-    }
-
-    printf("\n\ng = %.5lf | Eo = %.5lf | Efermi = %.5lf",g,Eo/Npar,Ef/Npar);
+    printf("\n\ng = %.5lf | Eo = %.5lf",g,Eo/Npar);
 
 
     printf("\n\n======================================\n\n");

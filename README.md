@@ -56,3 +56,10 @@ of how to implement and improve multiconfigurational method, despite there are
 some groups that already dominate the technique and apply in many areas of
 Physics. Thus we hope these codes clearly show the time demanded and how to
 improve codes based on multi configuration.
+
+A program that apply the methods for a physical system is available. The file
+'*groundStateLieb.c*' uses Lanczos algorithm with LAPACK to compute the smallest
+eigenvalue of the many-body Hamiltonian, i.e, the ground state energy for a
+system of bosons with contact interaction and periodic boundary conditions. This
+system is known as Lieb-Liniger gas and can be compared with the available
+analytical solution.
