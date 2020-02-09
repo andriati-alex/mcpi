@@ -19,7 +19,6 @@
             -lmkl_gnu_thread \
             -lmkl_core \
             -qopenmp \
-            -lgomp \
             -O3 \
 
  * gcc -o exe groundStateLieb.c \
@@ -28,7 +27,6 @@
             -lmkl_gnu_thread \
             -lmkl_core \
             -fopenmp \
-            -lgomp \
             -lm \
             -O3 \
 
@@ -243,11 +241,16 @@ int lanczos(int lm, int Npar, int Morb, Iarray IF, Iarray strideOT,
         i,
         j,
         k,
-        nc;
+        nc,
+        threadId,
+        nthreads;
 
     double
         tol,
         maxCheck;
+
+    double complex
+        hc_update;
 
     Carray
         HC,
@@ -306,14 +309,29 @@ int lanczos(int lm, int Npar, int Morb, Iarray IF, Iarray strideOT,
             HC[j] = HC[j] - diag[i+1]*lvec[i+1][j];
         }
 
-        // Additional re-orthogonalization procedure
+        // Additional re-orthogonalization procedure. The main process
+        // is parallelized because depending on the number  of Lanczos
+        // iterations it may be the most demanding time,  beating even
+        // the time to apply the Hamiltonian
         for (j = 0; j < i + 2; j++) ortho[j] = carrDot(nc, lvec[j], HC);
-        for (j = 0; j < nc; j++)
+
+        #pragma omp parallel private(j,k,threadId,nthreads,hc_update)
         {
-            for (k = 0; k < i + 2; k++) HC[j] -= lvec[k][j] * ortho[k];
+            threadId = omp_get_thread_num();
+            nthreads = omp_get_num_threads();
+
+            for (j = threadId; j < nc; j += nthreads)
+            {
+                hc_update = HC[j];
+                for (k = 0; k < i + 2; k++)
+                {
+                    hc_update = hc_update - lvec[k][j] * ortho[k];
+                }
+                HC[j] = hc_update;
+            }
         }
 
-        if ( (i + 1) % 100 == 0 )
+        if ( (i + 1) % 25 == 0 )
         {
             printf("\n  %5.1lf%%",(100.0*i)/(lm-1));
         }
@@ -457,9 +475,6 @@ double ground(int Niter, int Npar, int Morb, Iarray IF, Iarray strideOT,
 int main(int argc, char * argv[])
 {
 
-    /*** NUMBER OF THREADS USED - CHOOSE ACCORDINGLY TO CPU LIMITS ***/
-    omp_set_num_threads(omp_get_max_threads() / 2);
-
     int
         i,
         nc,
@@ -501,7 +516,14 @@ int main(int argc, char * argv[])
 
 
 
-    nthreads = omp_get_max_threads() / 2;
+    /*** NUMBER OF THREADS USED - CHOOSE ACCORDINGLY TO CPU LIMITS ***/
+    omp_set_num_threads(omp_get_max_threads() / 2);
+
+    #pragma omp parallel
+    {
+        #pragma omp single
+        nthreads = omp_get_num_threads();
+    }
 
     if (argc != 4)
     {
