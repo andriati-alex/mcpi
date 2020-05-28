@@ -39,10 +39,10 @@ import matplotlib.pyplot as plt;
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes;
 
 # figure parameters
-mpl.rcParams['text.usetex'] = True;
-mpl.rcParams['font.family'] = 'serif';
-mpl.rcParams['font.serif'] = 'DejaVu Sans';
-mpl.rcParams['font.size'] = 10;
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.serif'] = 'DejaVu Sans'
+mpl.rcParams['font.size'] = 8
 
 
 
@@ -88,31 +88,44 @@ else :
 Enum = np.loadtxt('liebGS.dat');
 gnum = Enum[:,0];
 
-fig = plt.figure(figsize=(7,6.2));
+fig = plt.figure(figsize=(3.3,3));
 ax = plt.gca();
 
-ax.plot(gs,E,lw=1,color='black',label='LL gas');
-ax.plot(gnum,Enum[:,1],'bo',label='21 IPS',markerfacecolor='none');
-ax.plot(gnum,Enum[:,2],'g+',label='11 IPS',);
-ax.axhline(Efermi,0.7,1,lw=3,ls='--',color='red',label='TG gas');
+ax.plot(gs,E,lw=0.6,color='black',label='LL gas');
+ax.plot(gnum,Enum[:,1],'bo',ms=3,label='21 IPS',markerfacecolor='none');
+ax.plot(gnum,Enum[:,2],'g+',ms=3,label='11 IPS',);
+ax.axhline(Efermi,0.6,1,lw=1,ls='--',color='red',label='TG gas');
 ax = plt.gca();
 ax.set_xlim(gs[0],gs[-1]);
 ax.set_ylim(E[0],Enum[-1,2]*1.05);
-ax.set_ylabel("$E_0 (m L^2 / \hbar^2)$",fontsize=12);
-ax.set_xlabel("$g (m L^2 / \hbar^2)$",fontsize=12);
-ax.legend(loc='lower right');
+# LABEL DAS FIGURAS
+ax.set_ylabel("$E_0 m L^2 / \hbar^2$",fontsize=9);
+ax.set_xlabel("$g m L / \hbar^2$",fontsize=9);
+ax.legend(loc='lower right',fontsize=7,handlelength=1.2);
 ax.yaxis.set_minor_locator(mpl.ticker.AutoMinorLocator(4));
 ax.xaxis.set_minor_locator(mpl.ticker.AutoMinorLocator(4));
+ax.tick_params(length=5)
+ax.tick_params(which="minor",length=3)
+ax.tick_params(right=True)
+ax.tick_params(which='minor',right=True)
 
 # plot zoom
-axin = inset_axes(ax,width="50%",height="45%",loc=8,borderpad=2);
-axin.plot(gs[:60],E[:60],'k-');
-axin.plot(gnum,Enum[:,1],'bo',ms=6,markerfacecolor='none');
-axin.plot(gnum,Enum[:,2],'g+',ms=6);
+bnds = [0.2,0.1,0.45,0.4]
+axin = ax.inset_axes(bounds=bnds);
+axin.plot(gs[:60],E[:60],'k-',lw=0.6);
+axin.plot(gnum,Enum[:,1],'bo',ms=3,markerfacecolor='none');
+axin.plot(gnum,Enum[:,2],'g+',ms=3);
 axin.tick_params(axis='both',which='major',labelsize=8);
 axin.set_xlim(0,60);
 axin.set_ylim(0,35);
 axin.yaxis.set_minor_locator(mpl.ticker.AutoMinorLocator(2));
 axin.xaxis.set_minor_locator(mpl.ticker.AutoMinorLocator(4));
+axin.tick_params(axis='y',pad=0.3)
+axin.tick_params(axis='x',pad=1.8)
+axin.tick_params(length=5)
+axin.tick_params(which="minor",length=3)
+axin.tick_params(axis='both',labelsize=7)
+axin.tick_params(right=True)
+axin.tick_params(which='minor',right=True)
 
 plt.savefig('LiebComparison.pdf',dpi=256,bbox_inches='tight');
