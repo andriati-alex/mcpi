@@ -1,40 +1,3 @@
-
-/****   AUTHOR INFORMATION
- 
- NAME : Alex Valerio Andriati
- AFFILIATION : University of São Paulo - Brazil
-
- Last update : December/18/2019
-
----------------------------------------------------------------------------
-
- ****  PROGRAM TO DEMONSTRATE HOW THE MAPPING OF CONFIGURATIONS WORKS
-
- * Demonstrate the basics functions useful for computation of many-body
- * quantities in Fock state basis.
- *
- * COMPILATION :
- *
- * icc demonstrateFockMap.c -lm -o exe (if intel compiler is available)
- * gcc demonstrateFockMap.c -lm -o exe
- *
- * EXECUTION :
- *
- * ./exe Nparticles Norbitals
- *
- * First command line argument is the number of particles and  the second
- * is the number of orbitals. It prints on the screen all the Fock states
- * enumerated, that is, the hashing table. Moreover it shows the mappings
- * for some cases
- *
- * IMPORTANT NOTE : this is suppose to be a simple demonstration, then do
- * not use large number of particles or orbitals because it would mess up
- * the output on the screen
- *
---------------------------------------------------------------------------- **/
-
-
-
 #include "configurationsMap.h"
 
 int HaveMomentum(unsigned int Morb, int * conf, int lz)
@@ -69,12 +32,12 @@ int main(int argc, char * argv[])
         k,
         lz,
         nc,
+        nL,
         Npar, // number of particles
         Morb, // number of orbitals
         mustPrint;
 
     Iarray
-        NCmat,
         IFmat;
 
     if (argc != 4)
@@ -96,21 +59,24 @@ int main(int argc, char * argv[])
 
     if (nc > 5000 || Morb > 7)
     {
-        printf("\n\nWARNING: lARGE SYSTEM CAN MESS UP THE OUTPUT\n\n");
+        printf("\n\nWARNING: LARGE SYSTEM PRODUCES BAD OUTPUT FORMAT\n\n");
     }
 
-    NCmat = setupNCmat(Npar,Morb);
     IFmat = setupFocks(Npar,Morb);
 
     printf("\n\n\n");
 
-    if (nc < 10000)
+    nL = 0;
+
+    if (nc < 7500)
     {
 
-        printf("Configuration  [");
+        printf("Configurations with L = %d\n\n",lz);
 
-        for (i = 0; i < Morb - 1; i++) printf(" Orb%d ,",i + 1);
-        printf(" Orb%d ]", Morb);
+        printf("Momentum IPS   [");
+
+        for (i = 0; i < Morb - 1; i++) printf(" %3d  ,",i-Morb/2);
+        printf(" %3d  ]",(Morb-1)-Morb/2);
 
         printf("\n=============================================");
         printf("================================");
@@ -120,35 +86,34 @@ int main(int argc, char * argv[])
             mustPrint = HaveMomentum(Morb,&IFmat[Morb*i],lz);
             if (mustPrint)
             {
+                nL = nL + 1;
                 printf("\n%8d       [", i);
                 for (j = 0; j < Morb - 1; j++)
                 {
                     printf(" %3d  ,",IFmat[j+Morb*i]);
                 }
                 printf(" %3d  ]", IFmat[Morb - 1 + Morb*i]);
-
-                k = FockToIndex(Npar,Morb,NCmat,&IFmat[Morb*i]);
-                if (k != i)
-                {
-                    // Self consistency check, if the Fock state in the
-                    // hashing table that was constructed using IndexToFock
-                    // function gives the correc index when converted back
-                    printf("\n\nERROR: Wrong map from FockToIndex\n\n");
-                }
             }
         }
     }
 
     else
     {
-        printf("\n\nWARNING : Not printing, too large system with ");
-        printf("total number of configurations higher than 10000\n");
+        printf("\n\nWARNING : Not printing, too large system or number ");
+        printf("of configurations\n\n");
+        for (i = 0; i < nc; i++)
+        {
+            mustPrint = HaveMomentum(Morb,&IFmat[Morb*i],lz);
+            if (mustPrint) nL = nL + 1;
+        }
     }
 
 
 
     free(IFmat);
     free(NCmat);
+
+    printf("\n\nTotal number of states with L = %d : %d\n\n",lz,nL);
 
     printf("\n\nDone.\n\n");
     return 0;
