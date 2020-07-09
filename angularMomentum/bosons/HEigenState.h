@@ -6,14 +6,14 @@
     #include <omp.h>
 #endif
 
-#include "HMatrixSetup.h"
+#include "HMatrix.h"
 
 
 
 double complex carrDot(int n, Carray v1, Carray v2)
 {
 
-/** Convetional scalar product for complex vectors **/
+/** Convetional L2 scalar product for complex vectors **/
 
     int i;
 
@@ -28,6 +28,9 @@ double complex carrDot(int n, Carray v1, Carray v2)
 
 double carrMod(int n, Carray v)
 {
+
+/** Conventional L2 modulus of complex vectors **/
+
     int i;
 
     double mod = 0;
@@ -45,6 +48,10 @@ double carrMod(int n, Carray v)
 void matmul(int n, Iarray rows, Iarray cols, Carray vals,
             Carray vin, Carray vout)
 {
+
+/** Parallelized routine to perform matrix-vector multiplication from
+    a sparse matrix structure given by 'rows', 'cols' and 'vals'  **/
+
     int
         i,
         j,
@@ -91,7 +98,7 @@ int lanczos(int lm, int nc, HConfMat H, Carray diag, Carray offdiag,
         offdiag - symmetric elements of tridiagonal matrix
 
     RETURN :
-        number of itertion done (just lm if the method does not breakdown) **/
+        number of itertion done (just 'lm' if none breakdown occurred) **/
 
     int
         i,
@@ -141,10 +148,8 @@ int lanczos(int lm, int nc, HConfMat H, Carray diag, Carray offdiag,
         if (creal(offdiag[i]) / maxCheck < tol) return i;
 
         for (j = 0; j < nc; j++) lvec[i+1][j] = HC[j] / offdiag[i];
-        // carrScalarMultiply(nc, HC, 1.0 / offdiag[i], lvec[i + 1]);
 
-        //applyHconf_omp(Npar,Morb,Map,MapOT,MapTT,strideOT,strideTT,IF,
-        //           lvec[i+1],Ho,Hint,HC);
+        // apply Hamiltonian in a vector from configurational basis
         matmul(nc,H->rows,H->cols,H->vals,lvec[i+1],HC);
 
         for (j = 0; j < nc; j++)
@@ -181,10 +186,7 @@ int lanczos(int lm, int nc, HConfMat H, Carray diag, Carray offdiag,
             }
         }
 
-        if ( (i + 1) % 25 == 0 )
-        {
-            printf("\n  %5.1lf%%",(100.0*i)/(lm-1));
-        }
+        printf("\n  %3d/%d",i+1,lm);
     }
 
     printf("\n===========   FINISHED LANCZOS ITERATIONS\n");

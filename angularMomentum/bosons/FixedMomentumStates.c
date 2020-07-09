@@ -1,5 +1,5 @@
 #include <time.h>
-#include "HMatrixSetup.h"
+#include "HMatrix.h"
 
 #define PI 3.141592653589793
 
@@ -34,7 +34,7 @@ int NaiveSetup(unsigned int Npar, unsigned int Morb, int L)
 
     // first setup a hashing table for the general problem without
     // fixing the angular momentum required in the argument 'L'
-    general_ht = setupFocks(Npar,Morb);
+    general_ht = setupConfigHT(Npar,Morb);
 
     for (n = 0; n < nc; n++)
     {
@@ -128,7 +128,7 @@ int main(int argc, char * argv[])
     // COMPUTE IN A NAIVE WAY FIRST ASSEMBLING THE
     // THE HASHING TABLE WITHOUT RESTRICTIOS
     nc = NC(Npar,2*lmax+1); // Size of config. without restrictions
-    if (nc*(2*lmax+1)*sizeof(int) < 1E9)
+    if (nc*(2*lmax+1)*sizeof(int) < MEMORY_TOL)
     {
         start = clock(); // trigger to measure time
         k = NaiveSetup(Npar,2*lmax+1,totalL);
@@ -148,7 +148,8 @@ int main(int argc, char * argv[])
     {
         printf("\n\nWARNING : The naive setup of Conf. space is not ");
         printf("being evaluated because it exceeds memory tolerance to ");
-        printf("store the general hashing table ( > 1GB )\n\n");
+        printf("store the general hashing table ( > %.1lf )\n\n",
+               ((double) MEMORY_TOL) / 1E9);
     }
 
 
@@ -235,7 +236,7 @@ int main(int argc, char * argv[])
 
     printf("\nTime to setup multiconfig. naively using all config. : ");
     if (time_naive < 0.1) printf("%.1lf(ms)",time_naive*1000);
-    else printf(" %.1lf(s)",time_naive);
+    else printf("%.1lf(s)",time_naive);
 
     printf("\nTime to setup H. matrix : ");
     if (time_H < 0.1)

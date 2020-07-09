@@ -20,9 +20,9 @@ typedef struct _TensorProd_ht * TensorProd_ht;
 struct _CompoundSpace
 {
 
-/** The compound space is design by selecting the momenta in integer
-    units separately for species A and B, such that La + Lb = L.  In
-    this way, it is possible to define an array of subspace for each
+/** The compound space is design by selecting the momenta in  integer
+    units separately for species A and B, such that  La + Lb = L.  In
+    this way, it is possible to define an array of subspaces for each
     possible combination of angular momenta. **/
 
     int
@@ -61,7 +61,8 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
         La,
         Lb,
         n_sub,
-        size;
+        size,
+        MemReq;
 
     Iarray
         nc_a,
@@ -80,18 +81,19 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
     // the momentum. For bosons the values for 'La'  are in the range
     // - Na * lmax , ... , 0 , ... , Na * lmax. Once 'La' is fixed
     // we must have Lb = L - La
-    nc_a = iarrDef(2*Na*lmax+1);
-    nc_b = iarrDef(2*Na*lmax+1);
+    nc_a = iarrDef(2*Na*lmaxA+1);
+    nc_b = iarrDef(2*Na*lmaxA+1);
 
+    i = 0;
     size = 0;
     n_sub = 0;
+    MemReq = 0;
     for (La = -Na*lmaxA; La <= Na*lmaxA; La++)
     {
         // Search for the possible combinations of momenta of spaces A and B
         Lb = L-La;
         nc_a[i] = BFixedMom_mcsize(Na,lmaxA,La);
         nc_b[i] = BFixedMom_mcsize(Nb,lmaxB,Lb);
-        i++;
         if (nc_a[i]*nc_b[i] > 0)
         {
             // When the separate spaces with momenta 'La' and 'Lb'
@@ -99,7 +101,27 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
             // system through the tensor product
             n_sub++; // Add counter of subspaces found
             size = size + nc_a[i]*nc_b[i]; // size of compound basis updated
+
+            if (size > INT_MAX - nc_a[i]*nc_b[i])
+            {
+                printf("\n\nINDEX ERROR : the structure for the basis ");
+                printf("of the compound multiconfig. basis cannot be ");
+                printf("indexed with 32-bit integers\n\n");
+                printf("Program aborted at function 'AllocCompBasis' ");
+                printf("in file 'mixtures.h'\n\n");
+                exit(EXIT_FAILURE);
+            }
+
+            MemReq += (nc_a[i]*(2*lmaxA+1) + nc_b[i]*(2*lmaxB+1))*sizeof(int);
+            if (MemReq > MEMORY_TOL)
+            {
+                printf("\n\nPROGRAM ABORTED : Estimated memory required ");
+                printf("to setup the compound config. basis exceeded the ");
+                printf("tolerance %.1lf(GB)\n\n",((double) MEMORY_TOL)/1E9);
+                exit(EXIT_FAILURE);
+            }
         }
+        i++;
     }
 
     S->sub = (TensorProd_ht) malloc(n_sub*sizeof(struct _TensorProd_ht));
@@ -139,6 +161,8 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
 
 void BBgetConfigs(int k, CompoundSpace S, Iarray occA, Iarray occB)
 {
+
+/** Setup in 'occA' and 'occB' the occupation numbers corresponding to 'k' **/
 
     int
         i,
@@ -200,6 +224,8 @@ void BBgetConfigs(int k, CompoundSpace S, Iarray occA, Iarray occB)
 
 int BBgetIndex(CompoundSpace S, Iarray occA, Iarray occB)
 {
+
+/** Return the index of the tensor product of 'occA' with 'occB' **/
     int
         n,
         ia,

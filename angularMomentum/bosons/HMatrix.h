@@ -1,11 +1,14 @@
-#ifndef _HMatrixSetup_h
-#define _HMatrixSetup_h
+#ifndef _HMatrix_h
+#define _HMatrix_h
 
 #include <math.h>
 #include "LBoseFockSpace.h"
 
 struct _HConfMat
 {
+
+/* Sparse matrix structure for Hamiltonian matrix in Config. space */
+
     int
         nnze;
 
@@ -51,13 +54,22 @@ void freeHmat(HConfMat M)
 
 void InsertNZ_ind(int * next_i, int col, Iarray nz_ind)
 {
+
+/** Auxiliar function to record indexes where the Hamiltonian matrix
+    has nonzero entries.  'next_i'  marks  the  next position in the
+    array 'nz_ind' to set a new column index  IF IT IS NOT CONTAINED
+    in the array 'nz_ind' yet. 'col' is the column index where a non
+    zero entry was found. **/
+
     int
         i;
 
     for (i = 0; i < *next_i; i++)
     {
+        // if the column index already appeared it does nothing
         if (nz_ind[i] == col) return;
     }
+    // The column index 'col' was not introduced yet.
     nz_ind[*next_i] = col;
     *next_i = *next_i + 1;
 }
@@ -78,7 +90,7 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
         nnze,
         next_i,
         filledIPS,
-        maxNonZeroInRow;
+        MemReq;
 
     Iarray
         z,
@@ -87,7 +99,12 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
     M = 2 * lmax + 1;   // total number of IPS
     v = iarrDef(M);     // vector of occupation numbers
 
-    nnze = 0; // total Number of NonZero elements
+    nnze = 0; // total Number of NonZero Elements
+
+    // 'z' stack up all column indexes that contains a non-zero
+    // entry in the Hamiltonian matrix.  Of  curse  the maximum
+    // size of 'z' is the dimension of the space 'mcsize'.
+    z = iarrDef(mcsize);
 
     for (i = 0; i < mcsize; i++)
     {
@@ -99,20 +116,13 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
             if (v[k] > 0) filledIPS = filledIPS + 1;
         }
 
-        // The maximum number of nonzero elements in a row is given  by  the
-        // number of possible removals and replacements of 1 and 2 particles
-        // from the current configuration.  Note that the contribution  from
-        // the  annihilation/creation  of 1 particle is only one, since both
-        // operations need to be in the same IPS to conserve momentum
-        // maxNonZeroInRow = NC(2,filledIPS)*NC(2,M) + 1;
-        // maxNonZeroInRow = mcsize;
-
-        z = iarrDef(mcsize);
-        // initialize with the diagonal index (aways present)
+        // initialize with the diagonal index  (aways  present)
+        // from the rules that remove and replace the particles
+        // in the same states,  thus providing the same config.
         z[0] = i;
         next_i = 1;
 
-        // Rule 6: Creation on k k / Annihilation on q l
+        // Rule : Creation on k k / Annihilation on q l
         // ONLY IN CASE q + l = 2 * k
         for (k = 0; k < M; k++)
         {
@@ -133,7 +143,7 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
             }
         }
 
-        // Rule 7: Creation on k s / Annihilation on q q
+        // Rule : Creation on k s / Annihilation on q q
         // ONLY IN CASE k + s = 2 * q
         for (q = 0; q < M; q++)
         {
@@ -154,7 +164,7 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
             }
         }
 
-        // Rule 9: Creation on k s / Annihilation on q l
+        // Rule : Creation on k s / Annihilation on q l
         // ONLY IN CASE k + s = q + l
         for (k = 0; k < M; k++)
         {
@@ -185,10 +195,19 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
         // Add the number of non-zero entries in this row
         nnze = nnze + next_i;
         NNZrow[i] = next_i;
-        free(z);
+
+        MemReq = nnze*(sizeof(int)+sizeof(double complex))+mcsize*sizeof(int);
+        if (MemReq > MEMORY_TOL)
+        {
+            printf("\n\nPROCESS ABORTED : The estimated memory required ");
+            printf("to set the Hamiltonian matrix will exceed the ");
+            printf("tolerance of %.1lf(GB).\n\n",((double) MEMORY_TOL)/1E9);
+            exit(EXIT_FAILURE);
+        }
     }
 
     free(v);
+    free(z);
     return nnze;
 }
 
@@ -207,8 +226,7 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
         p,
         t,
         Nips,
-        nnze,
-        MemReq;
+        nnze;
 
     double
         bosef;
@@ -231,13 +249,6 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
     // matrix structure including the nonzero entries per row
     NNZrow = iarrDef(mcsize);
     nnze = NNZ_PerRow(N,lmax,mcsize,ht,NNZrow);
-
-    MemReq = nnze*(sizeof(int)+sizeof(double complex))+mcsize*sizeof(int);
-    if (MemReq > 2E9)
-    {
-        printf("\n\nERROR : Hamiltonian matrix exceed memory tolerance\n\n");
-        exit(EXIT_FAILURE);
-    }
 
     M = allocEmptyMat(mcsize,nnze);
 
@@ -271,21 +282,21 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
         // CASES NO SEARCH FOR NEW CONF. INDEX IS REQUIRED  SINCE  ALL
         // PARTICLES REMOVED ARE REPLACED IN THE SAME STATES
 
-        // Rule 0: non-interacting part - creation and annihilation at k
+        // Rule : non-interacting part - creation and annihilation at k
         for (k = 0; k < Nips; k++)
         {
             if (v[k] < 1) continue;
             w = w + Ho[k] * v[k];
         }
 
-        // Rule 1: Creation on k k / Annihilation on k k
+        // Rule : Creation on k k / Annihilation on k k
         for (k = 0; k < Nips; k++)
         {
             bosef = v[k] * (v[k] - 1);
             z = z + g * bosef;
         }
 
-        // Rule 2: Creation on k s / Annihilation on k s
+        // Rule : Creation on k s / Annihilation on k s
         for (k = 0; k < Nips; k++)
         {
             if (v[k] < 1) continue;
@@ -296,12 +307,12 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
             }
         }
 
-        // FINISH THE DIAGONAL
+        // FINISH THE DIAGONAL AND SETUP NON-DIAGONAL ENTRIES
         M->cols[t] = i;
         M->vals[t] = w + z/2;
         t = t + 1;
 
-        // Rule 6: Creation on k k / Annihilation on q l
+        // Rule : Creation on k k / Annihilation on q l
         // ONLY IN CASE q + l = 2 * k
         for (k = 0; k < Nips; k++)
         {
@@ -349,7 +360,7 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
             }
         }
 
-        // Rule 7: Creation on k s / Annihilation on q q
+        // Rule : Creation on k s / Annihilation on q q
         // ONLY IN CASE k + s = 2 * q
         for (q = 0; q < Nips; q++)
         {
@@ -396,11 +407,11 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
             }
         }
 
-        // Rule 8: Creation on k s / Annihilation on s l
+        // Rule : Creation on k s / Annihilation on s l
         // ONLY IN CASE k = l, BUT this case is included
         // in rule 2
 
-        // Rule 9: Creation on k s / Annihilation on q l
+        // Rule : Creation on k s / Annihilation on q l
         // ONLY IN CASE k + s = q + l
         for (k = 0; k < Nips; k++)
         {

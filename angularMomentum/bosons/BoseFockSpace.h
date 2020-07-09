@@ -8,7 +8,7 @@ AFFILIATION : University of Sao Paulo - Brazil
 
 Last update : July/02/2019
 
-    * COMMENTS
+    COMMENTS
 
 Basic routines to setup a multiconfiguration problem for bosons.  The
 ordering of the config. follows the cost function based on the number
@@ -16,10 +16,15 @@ of possibilities to fit indistinguishable balls in different boxes.
 
 ****/
 
-#include <limits.h>
 #include <complex.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+
+
+// Vector of integer numbers
+typedef int * Iarray;
 
 // Vector of real numbers
 typedef double * Rarray;
@@ -29,9 +34,6 @@ typedef double complex * Carray;
 
 // Matrix of complex numbers
 typedef double complex ** Cmatrix;
-
-// Vector of integer numbers
-typedef int * Iarray;
 
 
 
@@ -45,7 +47,8 @@ Rarray rarrDef(unsigned int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\nMEMORY ERROR : malloc fail for double\n\n");
+        printf("\n\nMEMORY ERROR : malloc fail for double");
+        printf(" Size requested : %ld double\n\n",n);
         exit(EXIT_FAILURE);
     }
 
@@ -62,7 +65,8 @@ Carray carrDef(unsigned int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\nMEMORY ERROR : malloc fail for complex\n\n");
+        printf("\n\nMEMORY ERROR : malloc fail for complex.");
+        printf(" Size requested : %ld double complex\n\n",n);
         exit(EXIT_FAILURE);
     }
 
@@ -79,8 +83,8 @@ Iarray iarrDef(unsigned int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\nMEMORY ERROR : malloc fail for integer.");
-        printf(" Size requested : %ld\n\n", n * sizeof(int));
+        printf("\n\nMEMORY ERROR : malloc fail for integer.");
+        printf(" Size requested : %ld integers\n\n",n);
         exit(EXIT_FAILURE);
     }
 
@@ -100,7 +104,8 @@ Cmatrix cmatDef(unsigned int m, unsigned int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\nMEMORY ERROR : malloc fail for (complex *)\n\n");
+        printf("\n\nMEMORY ERROR : malloc fail for (complex *)");
+        printf(" Requested %d double pointers to complex\n\n",m);
         exit(EXIT_FAILURE);
     }
 
@@ -114,7 +119,9 @@ Cmatrix cmatDef(unsigned int m, unsigned int n)
 int NC(int N, int M)
 {
 
-/** Number of Configurations(NC) of N particles in M states **/
+/** Number of Configurations(NC) of N particles in M states. It is
+    equivalent to the problem of the number of ways to fit N balls
+    in M different boxes. **/
 
     long
         j,
@@ -208,15 +215,12 @@ Iarray setupNCmat(int N, int M)
 
 
 
-void IndexToFock(int k, int N, int M, Iarray v)
+void indexToConfig(int k, int N, int M, Iarray v)
 {
 
-/** Given an integer index 0 < k < NC(N,M) setup on v
-    the corresponding Fock vector with v[j] being the
-    occupation number on state j.
-
-    This routine corresponds to an implementation of Algorithm 2
-    of the article **/
+/** Given an integer index  0 < k < NC(N,M)  setup on v
+    the corresponding configuration with v[j] being the
+    occupation number on single particle state j.   **/
 
     int
         i,
@@ -228,8 +232,8 @@ void IndexToFock(int k, int N, int M, Iarray v)
 
     while ( k > 0 )
     {
-        // Check if can 'pay' the cost to put  the  particle
-        // in current state. If not, try a 'cheaper' one
+        // Check if can 'pay' the cost to put the particle
+        // in the current state. If not, try a cheaper one
         while ( k - NC(N,m) < 0 ) m = m - 1;
 
         k = k - NC(N,m); // subtract cost
@@ -243,14 +247,12 @@ void IndexToFock(int k, int N, int M, Iarray v)
 
 
 
-int FockToIndex(int N, int M, Iarray NCmat, Iarray v)
+int configToIndex(int N, int M, Iarray NCmat, Iarray v)
 {
 
-/** Convert an occupation vector v to a integer number from
-    0 to the NC(N,M) - 1. It uses the  NCmat  structure  to
-    avoid calls of NC function, see setupNCmat function above
-
-    This routines is an implementation of algorithm 1 of the article **/
+/** Convert an occupation vector v to a integer number between
+    0 and NC(N,M) - 1. It uses the NCmat structure to avoid
+    calls of NC function, see setupNCmat function above    **/
 
     int
         i,
@@ -279,7 +281,7 @@ int FockToIndex(int N, int M, Iarray NCmat, Iarray v)
 
 
 
-Iarray setupFocks(int N, int M)
+Iarray setupConfigHT(int N, int M)
 {
 
 /** A hashing table for the config. ordering.  It stores for each index
@@ -301,7 +303,7 @@ Iarray setupFocks(int N, int M)
 
     if (nc > INT_MAX / M)
     {
-        printf("\n\n\nMEMORY ERROR : Because of the size of the ");
+        printf("\n\nMEMORY ERROR : Because of the size of the ");
         printf("hashing table it cannot be indexed by 32-bit integers\n\n");
         exit(EXIT_FAILURE);
     }
@@ -310,7 +312,7 @@ Iarray setupFocks(int N, int M)
 
     for (k = 0; k < nc; k++)
     {
-        IndexToFock(k,N,M,&ItoFock[M*k]);
+        indexToConfig(k,N,M,&ItoFock[M*k]);
     }
 
     return ItoFock;

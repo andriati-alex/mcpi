@@ -3,6 +3,8 @@
 
 #include "BoseFockSpace.h"
 
+#define MEMORY_TOL 1E9
+
 
 
 int positiveMomentum(int M, Iarray occ)
@@ -32,7 +34,7 @@ void BCount_rec(int L, int l, int * vec, int vec_size, int * countAdd, int Nav)
     The first argument 'L' is how much has to be added yet. The second
     'l' is the last number added. 'vec' track the repetitions in  each
     number used. 'Nav' constrain the possible combination found to use
-    only up to 'Nav' numbers in the sum, corresponding to the number
+    only up to 'Nav' numbers in the sum,  corresponding  to the number
     of particles available. **/
 
     int
@@ -135,7 +137,8 @@ int BFixedMom_mcsize(int N, int lmax, int totalL)
         N0,
         Lp,
         Nconf,
-        maxIndex;
+        maxIndex,
+        MemReq;
 
     Iarray
         occ_Lp;
@@ -147,7 +150,7 @@ int BFixedMom_mcsize(int N, int lmax, int totalL)
     Nconf = 0;
     for (i = 0; i < maxIndex; i++)
     {
-        IndexToFock(i,N,M,occ_Lp);
+        indexToConfig(i,N,M,occ_Lp);
         Lp = positiveMomentum(M,occ_Lp);
         N0 = occ_Lp[0]; // particles available to set in l < 0 IPS
         // Check with the available particles if there is a  configuration
@@ -155,6 +158,17 @@ int BFixedMom_mcsize(int N, int lmax, int totalL)
         if (Lp - N0*lmax <= totalL && Lp >= totalL)
         {
             Nconf = Nconf + BCountPos(Lp-totalL,lmax,N0);
+        }
+
+        // estimate the memory required for the Hashing table
+        MemReq = Nconf * (2 * lmax + 1) * sizeof(int);
+        if (MemReq > MEMORY_TOL)
+        {
+            printf("\n\nPROCESS ABORTED : When computing the size of ");
+            printf("the multiconfg. space the estimated memory demanded ");
+            printf("to set the hashing table exceeded the tolerance ");
+            printf("of %.1lf\n\n",((double) MEMORY_TOL)/1E9);
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -315,7 +329,7 @@ Iarray * BAssembleHT(int N, int lmax, int totalL, int mcsize)
     conf_i = 0;
     for (i = 0; i < posL_mcsize; i++)
     {
-        IndexToFock(i,N,M,occ);
+        indexToConfig(i,N,M,occ);
         L = positiveMomentum(M,occ);
         // Check if with the available particles from l = 0 state (occ[0])
         // the maximum value of momentum that can be subtracted is enough

@@ -88,14 +88,17 @@ int main(int argc, char * argv[])
     end = clock();   // stop time measure
     time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 
+    printf("\nConfigurational basis successfully setup, ");
     if (time_used < 0.1)
     {
-        printf("\nTime to setup Conf. space : %.1lf(ms)",time_used*1000);
+        printf("Time to setup Conf. space : %.1lf(ms)",time_used*1000);
     }
     else
     {
-        printf("\nTime to setup Conf. space : %.1lf(s)",time_used);
+        printf("Time to setup Conf. space : %.1lf(s)",time_used);
     }
+
+    printf("\n\nConfiguring Hamiltonian Matrix ...\n");
 
     // Compute the total Number of NonZero elements in Hamiltonian matrix
     // 'nnz' and also record the Number of NonZero per row in NNZrow
@@ -192,12 +195,19 @@ int main(int argc, char * argv[])
     }
     else
     {
+        // Perform between 200 and 500 Lanczos  iterations
+        // depending on the config. space size.  For  very
+        // large spaces restart iterations to moderate the
+        // memory usage.
         coefMemory = mcSize * sizeof(double complex);
         if (mcSize < 1000) lan_it = 200;
         else
         {
             lan_it = 10;
-            while (lan_it*coefMemory < 1E9 && lan_it < 500) lan_it += 10;
+            while (lan_it*coefMemory < 2E9 && lan_it < 500)
+            {
+                lan_it += 10;
+            }
         }
 
         time_used = omp_get_wtime(); // trigger to measure time
