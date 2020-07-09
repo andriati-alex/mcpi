@@ -1,12 +1,12 @@
-#ifndef _Hdiagonal_h
-#define _Hdiagonal_h
+#ifndef _HEigenState_h
+#define _HEigenState_h
 
 #include <mkl.h>
 #ifdef _OPENMP
     #include <omp.h>
 #endif
-#include "Hmatrix_setup.h"
-#include "configurationsMap.h"
+
+#include "HMatrixSetup.h"
 
 
 

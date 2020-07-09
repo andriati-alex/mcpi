@@ -1,8 +1,8 @@
-#ifndef _Hmatrix_setup_h
-#define _Hmatrix_setup_h
+#ifndef _HMatrixSetup_h
+#define _HMatrixSetup_h
 
 #include <math.h>
-#include "configurationsMap.h"
+#include "LBoseFockSpace.h"
 
 struct _HConfMat
 {
@@ -49,52 +49,17 @@ void freeHmat(HConfMat M)
 
 
 
-int getIndex(int lmax, int ht_size, Iarray * ht, Iarray occ)
+void InsertNZ_ind(int * next_i, int col, Iarray nz_ind)
 {
-
-/** Search in the hashing table a configuration and RETURN its index **/
-
     int
-        i,
-        n,
-        lower,
-        upper;
+        i;
 
-    lower = 0;
-    upper = ht_size;
-    while (1)
+    for (i = 0; i < *next_i; i++)
     {
-        n = (upper + lower) / 2;
-
-        i = 2*lmax;
-        while(occ[i] == ht[n][i])
-        {
-            i = i - 1;
-            if (i == lmax) break;
-        }
-        if (i > lmax)
-        {
-            if (occ[i] > ht[n][i]) lower = n;
-            else upper = n;
-            continue;
-        }
-
-        i = 0;
-        while(occ[i] == ht[n][i])
-        {
-            i = i + 1;
-            if (i == lmax) break;
-        }
-        if (i < lmax)
-        {
-            if (occ[i] < ht[n][i]) lower = n;
-            else upper = n;
-            continue;
-        }
-
-        return n;
+        if (nz_ind[i] == col) return;
     }
-
+    nz_ind[*next_i] = col;
+    *next_i = *next_i + 1;
 }
 
 
@@ -110,7 +75,10 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
         s,
         q,
         M,
-        nnze;
+        nnze,
+        next_i,
+        filledIPS,
+        maxNonZeroInRow;
 
     Iarray
         z,
@@ -119,21 +87,30 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
     M = 2 * lmax + 1;   // total number of IPS
     v = iarrDef(M);     // vector of occupation numbers
 
-    // Boolean vector. For each row, mark the columns that has a nonzero entry
-    z = iarrDef(mcsize);
-
-    nnze = 0;
-
-    for (i = 0; i < mcsize; i++) NNZrow[i] = 0;
+    nnze = 0; // total Number of NonZero elements
 
     for (i = 0; i < mcsize; i++)
     {
-        // initialize boolean vector
-        for (j = 0; j < mcsize; j++) z[j] = 0;
+        // Identify how many IPS have some occupation
+        filledIPS = 0;
+        for (k = 0; k < M; k++)
+        {
+            v[k] = ht[i][k];
+            if (v[k] > 0) filledIPS = filledIPS + 1;
+        }
 
-        z[i] = 1; // diagonal is aways present
+        // The maximum number of nonzero elements in a row is given  by  the
+        // number of possible removals and replacements of 1 and 2 particles
+        // from the current configuration.  Note that the contribution  from
+        // the  annihilation/creation  of 1 particle is only one, since both
+        // operations need to be in the same IPS to conserve momentum
+        // maxNonZeroInRow = NC(2,filledIPS)*NC(2,M) + 1;
+        // maxNonZeroInRow = mcsize;
 
-        for (k = 0; k < M; k++) v[k] = ht[i][k];
+        z = iarrDef(mcsize);
+        // initialize with the diagonal index (aways present)
+        z[0] = i;
+        next_i = 1;
 
         // Rule 6: Creation on k k / Annihilation on q l
         // ONLY IN CASE q + l = 2 * k
@@ -142,15 +119,14 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
             if (v[k] < 2) continue;
             for (q = 0; q < M; q++)
             {
-                if (q == k || 2 * k - q < 0 || 2 * k - q >= M) continue;
                 l = 2 * k - q;
-                if (l > q) continue;
+                if (q == k || l < 0 || l > q) continue;
 
                 v[k] -= 2;
                 v[l] += 1;
                 v[q] += 1;
-                j = getIndex(lmax,mcsize,ht,v);
-                z[j] = 1;
+                j = BgetIndex(lmax,mcsize,ht,v);
+                InsertNZ_ind(&next_i,j,z);
                 v[k] += 2;
                 v[l] -= 1;
                 v[q] -= 1;
@@ -163,16 +139,15 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
         {
             for (k = 0; k < M; k++)
             {
-                if (q == k || 2 * q - k < 0 || 2 * q - k >= M) continue;
-
                 s = 2 * q - k;
-                if (v[k] < 1 || v[s] < 1 || s > k) continue;
+                if (q == k || s < 0 || s > k) continue;
+                if (v[k] < 1 || v[s] < 1) continue;
 
                 v[k] -= 1;
                 v[s] -= 1;
                 v[q] += 2;
-                j = getIndex(lmax,mcsize,ht,v);
-                z[j] = 1;
+                j = BgetIndex(lmax,mcsize,ht,v);
+                InsertNZ_ind(&next_i,j,z);
                 v[k] += 1;
                 v[s] += 1;
                 v[q] -= 2;
@@ -189,17 +164,16 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
                 if (v[s] < 1) continue;
                 for (q = 0; q < M; q++)
                 {
-                    if (q == s || q == k) continue;
-                    if (k + s - q < 0 || k + s - q >= M ) continue;
                     l = k + s - q;
-                    if (l <= q) continue;
+                    if (q == s || q == k) continue;
+                    if (l < 0  || l > q ) continue;
 
                     v[k] -= 1;
                     v[s] -= 1;
                     v[q] += 1;
                     v[l] += 1;
-                    j = getIndex(lmax,mcsize,ht,v);
-                    z[j] = 1;
+                    j = BgetIndex(lmax,mcsize,ht,v);
+                    InsertNZ_ind(&next_i,j,z);
                     v[k] += 1;
                     v[s] += 1;
                     v[q] -= 1;
@@ -209,15 +183,12 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
         }               // Finish k
 
         // Add the number of non-zero entries in this row
-        for (j = 0; j < mcsize; j++)
-        {
-            nnze = nnze + z[j];
-            NNZrow[i] = NNZrow[i] + z[j];
-        }
+        nnze = nnze + next_i;
+        NNZrow[i] = next_i;
+        free(z);
     }
 
     free(v);
-    free(z);
     return nnze;
 }
 
@@ -236,7 +207,8 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
         p,
         t,
         Nips,
-        nnze;
+        nnze,
+        MemReq;
 
     double
         bosef;
@@ -259,6 +231,13 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
     // matrix structure including the nonzero entries per row
     NNZrow = iarrDef(mcsize);
     nnze = NNZ_PerRow(N,lmax,mcsize,ht,NNZrow);
+
+    MemReq = nnze*(sizeof(int)+sizeof(double complex))+mcsize*sizeof(int);
+    if (MemReq > 2E9)
+    {
+        printf("\n\nERROR : Hamiltonian matrix exceed memory tolerance\n\n");
+        exit(EXIT_FAILURE);
+    }
 
     M = allocEmptyMat(mcsize,nnze);
 
@@ -341,7 +320,7 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
                 v[l] += 1;
                 v[q] += 1;
                 // Compute col index in 'j'
-                j = getIndex(lmax,mcsize,ht,v);
+                j = BgetIndex(lmax,mcsize,ht,v);
                 // value to be set in the matrix at col 'j'
                 // factor 2 counts for the symmetry q-l
                 z = 2 * g * bosef;
@@ -388,7 +367,7 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
                 v[s] -= 1;
                 v[q] += 2;
                 // Compute col index 'j'
-                j = getIndex(lmax,mcsize,ht,v);
+                j = BgetIndex(lmax,mcsize,ht,v);
                 // value to be set in the matrix at col 'j'
                 // factor 2 counts for the symmetry k-s
                 z = 2 * g * bosef;
@@ -441,7 +420,7 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
                     v[s] -= 1;
                     v[q] += 1;
                     v[l] += 1;
-                    j = getIndex(lmax,mcsize,ht,v);
+                    j = BgetIndex(lmax,mcsize,ht,v);
                     z = 4 * g * bosef;
                     // Check in the current row if the col 'j' has
                     // already been initialized.  Add contribution
