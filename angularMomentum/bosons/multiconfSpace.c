@@ -1,8 +1,6 @@
 #include <time.h>
 #include "HMatrix.h"
 
-#define PI 3.141592653589793
-
 
 
 int NaiveSetup(unsigned int Npar, unsigned int Morb, int L)
@@ -12,7 +10,7 @@ int NaiveSetup(unsigned int Npar, unsigned int Morb, int L)
     momentum 'L' in a naive way, which first assemble the hashing
     table of the unconstrained (arbitrary 'L') problem. The total
     number of orbitals is Morb = 2*lmax+1 where 'lmax' is the max.
-    orbital momentum, assuming them order as  -lmax , ... ,  lmax
+    orbital momentum, assuming their ordering -lmax , ... ,  lmax
  
     RETURN : size of constrained multiconfig. space with momentum 'L' **/
 
@@ -24,48 +22,45 @@ int NaiveSetup(unsigned int Npar, unsigned int Morb, int L)
         totalMom;
 
     Iarray
-        general_ht,
+        gen_config,
         HTindexes,
         ht;
 
-    count = 0;
-    nc = NC(Npar,Morb);
+    nc = NC(Npar,Morb); // size of entire config. space
+    // Array to mark the config. indexes that have the momentum demanded
     HTindexes = iarrDef(nc);
+    // general configurations without restrictions
+    gen_config = iarrDef(Morb);
 
-    // first setup a hashing table for the general problem without
-    // fixing the angular momentum required in the argument 'L'
-    general_ht = setupConfigHT(Npar,Morb);
-
+    count = 0;
     for (n = 0; n < nc; n++)
     {
+        // scan the entire configurational space without restriction
+        // selecting configurations that has the momentum demanded L
+        indexToConfig(n,Npar,Morb,gen_config);
         totalMom = 0;
         for (i = 0; i < Morb; i++)
         {
-            totalMom = totalMom + (i - Morb/2)*general_ht[i+n*Morb];
+            totalMom = totalMom + (i - Morb/2)*gen_config[i];
         }
-
-        // Update the numbering of Fock states
-        // which satisfy the momentum required
+        // Update the indexes of Fock states which have momentum L
         if (totalMom == L)
         {
-            // record index whose Fock state has momentum 'L'
+            // record index whose Fock state has momentum L
             HTindexes[count] = n;
             count++;
         }
     }
 
+    // Setup config.  with required momentum L
+    // previously marked by index in HTindexes
     ht = iarrDef(count*Morb);
-
-    // Copy the configurations that satisfy the momentum required
     for (n = 0; n < count; n++)
     {
-        for (i = 0; i < Morb; i++)
-        {
-            ht[i + n*Morb] = general_ht[i + HTindexes[n]*Morb];
-        }
+        indexToConfig(HTindexes[n],Npar,Morb,&ht[n*Morb]);
     }
 
-    free(HTindexes); free(ht); free(general_ht);
+    free(HTindexes); free(ht); free(gen_config);
     return count;
 }
 
@@ -80,10 +75,10 @@ int main(int argc, char * argv[])
         k,
         nc,
         nnz,
-        Npar, // number of particles
-        lmax, // number of orbitals
-        totalL,
-        mcSize;
+        Npar,   // number of particles
+        lmax,   // number of orbitals
+        totalL, // Momentum demanded for the config. space
+        mcSize; // Size of config. space constrained
 
     double
         l,
@@ -99,12 +94,6 @@ int main(int argc, char * argv[])
         NNZrow,
         * ht;
 
-    Carray
-        Ho;
-
-    HConfMat
-        H;
-
     if (argc != 4)
     {
         printf("\n\nERROR: Need three integer numbers from command line");
@@ -119,21 +108,30 @@ int main(int argc, char * argv[])
     sscanf(argv[3],"%d",&totalL);   // Constrained momentum of config.
 
     // COMPUTE DIRECTLY THE SPACE WITH MOMENTUM 'totalL'
+    printf("\nWorking on improved set up of L = %d space ",totalL);
+    printf(" ."); printf("."); printf(".");
     start = clock(); // trigger to measure time
     mcSize = BFixedMom_mcsize(Npar,lmax,totalL);
+    printf("..");
+    printf("..");
     ht = BAssembleHT(Npar,lmax,totalL,mcSize);
     end = clock();   // finish time measure
     time_direct = ((double) (end - start)) / CLOCKS_PER_SEC;
+    printf(" Done !");
 
     // COMPUTE IN A NAIVE WAY FIRST ASSEMBLING THE
     // THE HASHING TABLE WITHOUT RESTRICTIOS
+
     nc = NC(Npar,2*lmax+1); // Size of config. without restrictions
-    if (nc*(2*lmax+1)*sizeof(int) < MEMORY_TOL)
+    if (nc*sizeof(int) < MEMORY_TOL)
     {
+        printf("\nWorking on naive set up of L = %d space ",totalL);
+        printf(" ...");
         start = clock(); // trigger to measure time
         k = NaiveSetup(Npar,2*lmax+1,totalL);
         end = clock();   // finish time measure
         time_naive = ((double) (end - start)) / CLOCKS_PER_SEC;
+        printf(".... Done !");
 
         // Self-consistency check between methos to generate config.
         if (k != mcSize)
@@ -147,15 +145,14 @@ int main(int argc, char * argv[])
     else
     {
         printf("\n\nWARNING : The naive setup of Conf. space is not ");
-        printf("being evaluated because it exceeds memory tolerance to ");
-        printf("store the general hashing table ( > %.1lf )\n\n",
-               ((double) MEMORY_TOL) / 1E9);
+        printf("being evaluated because it exceeds memory tolerance ");
+        printf("( > %.1lf )\n\n",((double) MEMORY_TOL) / 1E9);
     }
 
 
 
-    // SHOW ON THE SCREEN SOME CONFIG.
-    if (mcSize < 1000)
+    // SHOW ON THE SCREEN SOME CONFIG. IF THERE ARE NOT TOO MANY
+    if (mcSize < 500)
     {
         printf("\n\nConfigurations with ang. momentum L = %d and",totalL);
         printf(" max(l) = %d\n",lmax);
@@ -182,52 +179,63 @@ int main(int argc, char * argv[])
         }
 
         printf("\n\n=========================================================");
-
     }
 
     NNZrow = iarrDef(mcSize); // Number of non-zero entries per row
     nnz = NNZ_PerRow(Npar,lmax,mcSize,ht,NNZrow);
 
-    k = 0;
-    j = 0;
-    // Extract maximum number of non-zero entries in a same row
-    for (i = 0; i < mcSize; i++)
+    if (nnz > 0)
     {
-        if (k < NNZrow[i]) k = NNZrow[i];
-        j = j + NNZrow[i];
-    }
-    // Self-consistency check for function that
-    // computes number of non-zero entries in H
-    if (j != nnz)
-    {
-        printf("\n\nFATAL ERROR : FUNCTION TO NONZERO ENTRIES IS WRONG\n\n");
-        exit(EXIT_FAILURE);
+        k = 0;
+        j = 0;
+        // Extract maximum number of non-zero entries in a same row
+        for (i = 0; i < mcSize; i++)
+        {
+            if (k < NNZrow[i]) k = NNZrow[i];
+            j = j + NNZrow[i];
+        }
+        // Self-consistency check for function that
+        // computes number of non-zero entries in H
+        if (j != nnz)
+        {
+            printf("\n\nFATAL ERROR : FUNCTION OF NONZERO ENTRIES\n\n");
+            exit(EXIT_FAILURE);
+        }
     }
 
-    printf("\n\nThere are %d Fock states with L = %d",mcSize,totalL);
+    printf("\n\n\n");
+    printf("\t*****************************************************\n");
+    printf("\t*                                                   *\n");
+    printf("\t*        SOME MULTICONFIG. SPACE INFORMATION        *\n");
+    printf("\t*                                                   *\n");
+    printf("\t*****************************************************\n");
+    printf("\n\n\n");
+
+    printf("There are %d Fock states with L = %d",mcSize,totalL);
     printf("\nthere are %d Fock states with arbitrary L",nc);
-    printf("\nNumber of nonzero entries in H : %d | ",nnz);
-    printf("Spartisty = %.5lf",1.0 - ((double) nnz)/mcSize/mcSize);
-    printf("\nMaximum number of nonzero entries in a same row : %d",k);
-    printf("\n\nMemory required for the:\n");
-    printf("\tmulticonfig. space constraining the momentum : %.1lf(Mb)\n",
-            ((double) mcSize*(2*lmax+1)*sizeof(int))/1E6);
-    printf("\tmulticonfig. space naively using all config. : %.1lf(Mb)\n",
-            ((double) (mcSize + nc)*(2*lmax+1) + nc)*sizeof(int)/1E6);
-    l = ((double) (nnz+mcSize)*sizeof(int) + nnz*sizeof(double complex));
-    printf("\tto store sparse 'Hamiltonian' matrix : %.1lf(Mb)\n",l/1E6);
-
-    Ho = carrDef(2*lmax+1);
-    for (i = 0; i < 2*lmax+1; i++)
+    if (nnz > 0)
     {
-        l = 2 * PI * (i-lmax);
-        Ho[i] = 0.5*l*l;
+        printf("\nNumber of nonzero entries in H : %d | ",nnz);
+        printf("Spartisty = %.5lf",1.0 - ((double) nnz)/mcSize/mcSize);
+        printf("\nMaximum number of nonzero entries in a same row : %d",k);
     }
-
-    start = clock(); // trigger to measure time
-    H = assembleH(Npar,lmax,mcSize,ht,Ho,1.0);
-    end = clock();   // finish time measure
-    time_H = ((double) (end - start)) / CLOCKS_PER_SEC;
+    else
+    {
+        printf("\nSparse matrix Hamiltonian exceeded allowed memory ");
+        printf("%.1lf(GB)",MEMORY_TOL/1E9);
+    }
+    printf("\n\nMemory required for the:\n");
+    l = ((double) mcSize*(2*lmax+1)*sizeof(int))/1E6;
+    printf("\tmulticonfig. space constraining the momentum : %.1lf(Mb)\n",l);
+    l = ((double) mcSize*(2*lmax+1) + nc)*sizeof(int)/1E6;
+    printf("\tmulticonfig. space naively using all config. : %.1lf(Mb)\n",l);
+    l = ((double) mcSize * sizeof(double complex))/1E6;
+    printf("\tA many-body state : %.1lf(Mb)\n",l);
+    if (nnz > 0)
+    {
+        l = ((double)(nnz+mcSize)*sizeof(int)+nnz*sizeof(double complex))/1E6;
+        printf("\tsparse 'Hamiltonian' matrix : %.1lf(Mb)\n",l);
+    }
 
     // TIME REQUIRED IN EACH IMPORTANT DATA STRUCTURE SETUP
     printf("\n\nTime to setup multiconfig. constraining the momentum : ");
@@ -238,24 +246,11 @@ int main(int argc, char * argv[])
     if (time_naive < 0.1) printf("%.1lf(ms)",time_naive*1000);
     else printf("%.1lf(s)",time_naive);
 
-    printf("\nTime to setup H. matrix : ");
-    if (time_H < 0.1)
-    {
-        printf("%.1lf(ms)",time_H*1000);
-    }
-    else
-    {
-        if (time_H < 60) printf("%.1lf(s)",time_H);
-        else             printf("%.1lf(min)",time_H/60.0);
-    }
-
     printf("\n\nDone.\n\n");
 
     for (i = 0; i < mcSize; i++) free(ht[i]);
     free(ht);
-    free(Ho);
     free(NNZrow);
-    freeHmat(H);
 
     return 0;
 }

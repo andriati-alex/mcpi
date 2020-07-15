@@ -19,8 +19,6 @@ int main(int argc, char * argv[])
 
     int
         i,
-        j,
-        k,
         nnz,
         Npar, // number of particles
         lmax, // number of orbitals
@@ -39,20 +37,12 @@ int main(int argc, char * argv[])
         imag,
         time_used;
 
-    clock_t
-        start,
-        end;
-
     Iarray
-        NNZrow,
-        * ht;
+        momentum;
 
     Carray
         C,
         Ho;
-
-    HConfMat
-        H;
 
     nthreads = omp_get_max_threads() / 2;
     omp_set_num_threads(nthreads);
@@ -77,101 +67,20 @@ int main(int argc, char * argv[])
     sscanf(argv[3],"%d",&totalL);
     sscanf(argv[4],"%lf",&g);
 
+    momentum = iarrDef(totalL+1);
+    for (i = 0; i <= totalL; i++)
+    {
+        momentum[i] = i;
+    }
 
-
-    // CONFIGURE MULTICONFIGURATIONAL SPACE - HASHING TABLE
-    printf("\nConfiguring multiconf. space structures ...\n");
-
-    start = clock(); // trigger to measure time
     mcSize = BFixedMom_mcsize(Npar,lmax,totalL);
-    ht = BAssembleHT(Npar,lmax,totalL,mcSize);
-    end = clock();   // stop time measure
-    time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 
-    printf("\nConfigurational basis successfully setup, ");
-    if (time_used < 0.1)
-    {
-        printf("Time to setup Conf. space : %.1lf(ms)",time_used*1000);
-    }
-    else
-    {
-        printf("Time to setup Conf. space : %.1lf(s)",time_used);
-    }
-
-    printf("\n\nConfiguring Hamiltonian Matrix ...\n");
-
-    // Compute the total Number of NonZero elements in Hamiltonian matrix
-    // 'nnz' and also record the Number of NonZero per row in NNZrow
-    NNZrow = iarrDef(mcSize);
-    nnz = NNZ_PerRow(Npar,lmax,mcSize,ht,NNZrow);
-
-    k = 0; // maximum NNZ in a same row of the matrix
-    j = 0; // Self-Consistency check with the returned value 'nnz'
-    for (i = 0; i < mcSize; i++)
-    {
-        if (k < NNZrow[i]) k = NNZrow[i];
-        j = j + NNZrow[i];
-    }
-    if (j != nnz)
-    {
-        printf("\n\nFATAL ERROR : FUNCTION TO COMPUTE ");
-        printf("NONZERO ELEMENTS OF SPARSE MATRIX IS WRONG\n\n");
-        exit(EXIT_FAILURE);
-    }
-
-
-
-    // ASSEMBLE THE HAMILTONIAN (SPARSE) MATRIX STRUCTURE
-
-
-
-    // Configure the single-particle hamiltonian matrix.
-    // Since it is diagonal  it is store in a  1D array.
     Ho = carrDef(2*lmax+1);
     for (i = 0; i < 2*lmax+1; i++)
     {
         l = 2 * PI * (i-lmax);
         Ho[i] = 0.5*l*l;
     }
-
-    start = clock(); // trigger to measure time
-    H = assembleH(Npar,lmax,mcSize,ht,Ho,g);
-    end = clock();   // stop time measure
-    time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-
-    if (time_used < 0.1)
-    {
-        printf("\nTime to setup multiconf. Hamiltonian matrix : ");
-        printf("%.1lf(ms)",time_used*1000);
-    }
-    else
-    {
-        printf("\nTime to setup multiconf. Hamiltonian matrix : ");
-        printf("%.1lf(s)",time_used);
-    }
-
-
-
-    // DISPLAY INFO ABOUT THE CONFIGURATIONAL SPACE ASSEMBLED
-
-
-
-    printf("\n\n----------------------------\n");
-    printf("Multiconf. space information\n");
-    printf("----------------------------\n");
-    printf("Total number of states (with L = %2d subjected to ",totalL);
-    printf("lmax = %d) is %d",lmax,mcSize);
-    printf("\nNumber of nonzero entries in H : %d ",nnz);
-    printf("Sparsity = %.5lf",1.0 - ((double) nnz)/mcSize/mcSize);
-    printf("\nMaximum number of nonzero entries in a same row : %d",k);
-    printf("\n=====================================");
-    printf("=====================================\n");
-
-
-
-    // COMPUTE THE GROUND STATE ENERGY AND STATE
-
-
 
     // define an initial guess for Lanczos tridiagonal decomposition
     C = carrDef(mcSize);
@@ -190,7 +99,8 @@ int main(int argc, char * argv[])
     {
         lan_it = mcSize - 1;
         time_used = omp_get_wtime(); // trigger to measure time
-        E0 = ground(lan_it,mcSize,H,C);
+        // E0 = ground(lan_it,Npar,lmax,totalL,C,Ho,g);
+        groundScanning(lan_it,Npar,lmax,momentum,totalL+1,Ho,g,"test.dat");
         time_used = omp_get_wtime() - time_used; // finish time measure
     }
     else
@@ -204,14 +114,15 @@ int main(int argc, char * argv[])
         else
         {
             lan_it = 10;
-            while (lan_it*coefMemory < 2E9 && lan_it < 500)
+            while (lan_it*coefMemory < 2*MEMORY_TOL && lan_it < 500)
             {
                 lan_it += 10;
             }
         }
 
         time_used = omp_get_wtime(); // trigger to measure time
-        E0 = ground(lan_it,mcSize,H,C);
+        // E0 = ground(lan_it,Npar,lmax,totalL,C,Ho,g);
+        groundScanning(lan_it,Npar,lmax,momentum,totalL+1,Ho,g,"test.dat");
         time_used = omp_get_wtime() - time_used; // finish time measure
     }
 
@@ -222,12 +133,8 @@ int main(int argc, char * argv[])
 
     printf("\n\nDone.\n\n");
 
-    for (i = 0; i < mcSize; i++) free(ht[i]);
     free(C);
-    free(ht);
     free(Ho);
-    free(NNZrow);
-    freeHmat(H);
 
     return 0;
 }

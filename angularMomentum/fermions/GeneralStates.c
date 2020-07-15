@@ -38,6 +38,8 @@ the output on the screen
 
 #include "FermiFockSpace.h"
 
+#define PRINT_TOL 10000
+
 
 
 int main(int argc, char * argv[])
@@ -87,7 +89,7 @@ int main(int argc, char * argv[])
     IFmat = setupFocks(Npar,Morb);
     printf("\n\n\n");
 
-    if (nc < 20000)
+    if (nc < PRINT_TOL)
     {
 
         if (Morb > 7)
@@ -173,7 +175,7 @@ int main(int argc, char * argv[])
     else
     {
         printf("\n\nWARNING : Not printing, conf. space too large with ");
-        printf("total number of configurations larger than 20000\n");
+        printf("total number of configurations larger than %d\n",PRINT_TOL);
     }
 
 

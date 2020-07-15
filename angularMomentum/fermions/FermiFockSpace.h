@@ -15,7 +15,11 @@
  Basic routines to setup the multiconfiguration space. Functions to setup a
  *hashing table*, convert configuration to index and index to configuration
 
- For the theoretical background one may consult the paper
+ A relevant paper for the theoretical background is
+
+    "A perfect Hashing function for exact diagonalization of
+    many-body systems of identical particles", Shoudan Liang
+    https://doi.org/10.1016/0010-4655(95)00108-R
  
 ****/
 
@@ -50,7 +54,8 @@ Rarray rarrDef(unsigned int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\nMEMORY ERROR : malloc fail for double\n\n");
+        printf("\n\nMEMORY ERROR : malloc fail for double. ");
+        printf("Size required : %d\n\n",n);
         exit(EXIT_FAILURE);
     }
 
@@ -67,7 +72,8 @@ Carray carrDef(unsigned int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\nMEMORY ERROR : malloc fail for complex\n\n");
+        printf("\n\nMEMORY ERROR : malloc fail for complex. ");
+        printf("Size required : %d\n\n",n);
         exit(EXIT_FAILURE);
     }
 
@@ -84,7 +90,7 @@ Iarray iarrDef(unsigned int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\nMEMORY ERROR : malloc fail for integer.");
+        printf("\n\nMEMORY ERROR : malloc fail for integer.");
         printf(" Size requested : %ld\n\n", n * sizeof(int));
         exit(EXIT_FAILURE);
     }
@@ -105,7 +111,7 @@ Cmatrix cmatDef(unsigned int m, unsigned int n)
 
     if (ptr == NULL)
     {
-        printf("\n\n\nMEMORY ERROR : malloc fail for (complex *)\n\n");
+        printf("\n\nMEMORY ERROR : malloc fail for (complex *)\n\n");
         exit(EXIT_FAILURE);
     }
 
@@ -268,7 +274,7 @@ Iarray setupFocks(int N, int M)
 
     if (nc > INT_MAX / M)
     {
-        printf("\n\n\nMEMORY ERROR : Because of the size of the");
+        printf("\n\nMEMORY ERROR : Because of the size of the");
         printf(" hashing table it can't be indexed by 32-bit integers\n\n");
         exit(EXIT_FAILURE);
     }

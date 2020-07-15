@@ -40,7 +40,7 @@ struct _CompoundSpace
 
     struct _TensorProd_ht
         * sub; // subspaces all possible Tensor product spaces
-}
+};
 
 typedef struct _CompoundSpace * CompoundSpace;
 
@@ -143,8 +143,8 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
             S->sub[j].Lb = Lb;
             S->sub[j].sizeA = nc_a[i];
             S->sub[j].sizeB = nc_b[i];
-            S->sub[j].hta = assembleHT(Na,lmaxA,La,nc_a[i]);
-            S->sub[j].htb = assembleHT(Nb,lmaxB,Lb,nc_b[i]);
+            S->sub[j].hta = BAssembleHT(Na,lmaxA,La,nc_a[i]);
+            S->sub[j].htb = BAssembleHT(Nb,lmaxB,Lb,nc_b[i]);
             size = size + nc_a[i]*nc_b[i];
             j++;
         }
@@ -155,6 +155,60 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
     free(nc_b);
 
     return S;
+}
+
+
+
+unsigned int EstimateMemory(CompoundSpace S)
+{
+
+/** Compute approximately the memory required to setup the config. space **/
+
+    unsigned int
+        j,
+        sub_mem,
+        mem_req,
+        lmaxA = S->lmaxA,
+        lmaxB = S->lmaxB;
+
+    sub_mem = 0;
+    for (j = 0; j < S->n_sub; j++)
+    {
+        sub_mem = sub_mem + S->sub[j].sizeA*(2*lmaxA+1)*sizeof(int);
+        sub_mem = sub_mem + S->sub[j].sizeB*(2*lmaxB+1)*sizeof(int);
+    }
+
+    mem_req = sub_mem + S->n_sub*(sizeof(struct _TensorProd_ht)+sizeof(int));
+    return mem_req;
+}
+
+
+
+void freeCompSpace(CompoundSpace S)
+{
+    int
+        j,
+        i;
+
+    free(S->strides);
+
+    // Free the Hashing table for each subspace
+    for (j = 0; j < S->n_sub; j++)
+    {
+        for (i = 0; i < S->sub[j].sizeA; i++)
+        {
+            free(S->sub[j].hta[i]);
+        }
+        free(S->sub[j].hta);
+        for (i = 0; i < S->sub[j].sizeB; i++)
+        {
+            free(S->sub[j].htb[i]);
+        }
+        free(S->sub[j].htb);
+    }
+
+    free(S->sub);
+    free(S);
 }
 
 
@@ -180,7 +234,7 @@ void BBgetConfigs(int k, CompoundSpace S, Iarray occA, Iarray occB)
     if (k > S->size)
     {
         printf("\n\nERROR : The index %d of the configurations ",k);
-        printf("exceed the size of the compound space %d\n\n"S->size);
+        printf("exceed the size of the compound space %d\n\n",S->size);
         exit(EXIT_FAILURE);
     }
 
@@ -208,7 +262,7 @@ void BBgetConfigs(int k, CompoundSpace S, Iarray occA, Iarray occB)
     {
         printf("\n\nERROR : wrong subspace index found %d - ",k);
         printf("Subspace with La = %d and Lb = %d ",La,Lb);
-        printf("has %d elements\n\n",SubSizeA*SSubSizeB);
+        printf("has %d elements\n\n",SubSizeA*SubSizeB);
         exit(EXIT_FAILURE);
     }
 
@@ -226,7 +280,9 @@ int BBgetIndex(CompoundSpace S, Iarray occA, Iarray occB)
 {
 
 /** Return the index of the tensor product of 'occA' with 'occB' **/
+
     int
+        i,
         n,
         ia,
         ib,
@@ -245,7 +301,7 @@ int BBgetIndex(CompoundSpace S, Iarray occA, Iarray occB)
 
     // First find the subspace index
     lower = 0;
-    upper = S->n_subs;
+    upper = S->n_sub;
     n = (upper + lower) / 2;
     while(La != S->sub[n].La)
     {
@@ -259,4 +315,48 @@ int BBgetIndex(CompoundSpace S, Iarray occA, Iarray occB)
     ib = BgetIndex(S->lmaxB,S->sub[n].sizeB,S->sub[n].htb,occB);
 
     return S->strides[n] + ib*S->sub[n].sizeA + ia;
+}
+
+
+
+void PrintConfig(CompoundSpace S)
+{
+
+    int
+        i,
+        j,
+        Ma,
+        Mb;
+
+    Iarray
+        occA,
+        occB;
+
+    Ma = 2 * S->lmaxA + 1;
+    Mb = 2 * S->lmaxB + 1;
+    occA = iarrDef(Ma);
+    occB = iarrDef(Mb);
+
+    printf("\n\nConfig. Index   [-lmaxA, ..., lmaxA] x [-lmaxB, ..., lmaxB]");
+    printf("\n___________________________________________________________\n");
+
+    for (i = 0; i < S->size; i++)
+    {
+        printf("\n%8d  ",i);
+        BBgetConfigs(i,S,occA,occB);
+        printf("[ ");
+        for (j = 0; j < Ma; j++) printf("%2d ",occA[j]);
+        printf(" ] x ");
+        printf("[ ");
+        for (j = 0; j < Mb; j++) printf("%2d ",occB[j]);
+        printf(" ] ");
+        j = BBgetIndex(S,occA,occB);
+        printf("%d",j);
+        if (i != j)
+        {
+            printf("\n\nERROR : The Hashing function are wrong ! ");
+            printf("Contact developer\n\n");
+            exit(EXIT_FAILURE);
+        }
+    }
 }
