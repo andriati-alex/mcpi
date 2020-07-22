@@ -1,48 +1,7 @@
+#ifndef _LBoseBoseFockSpace_h
+#define _LBoseBoseFockSpace_h
+
 #include "LBoseFockSpace.h"
-
-
-
-struct _TensorProd_ht
-{
-    int
-        La,     // momentum of config. space A
-        Lb,     // momentum of config. space B
-        sizeA,  // multiconfig. space size A
-        sizeB;  // multiconfig. space size B
-
-    Iarray
-        * hta,  // hashing table for config. in space A
-        * htb;  // hashing table for config. in space B
-};
-
-typedef struct _TensorProd_ht * TensorProd_ht;
-
-struct _CompoundSpace
-{
-
-/** The compound space is design by selecting the momenta in  integer
-    units separately for species A and B, such that  La + Lb = L.  In
-    this way, it is possible to define an array of subspaces for each
-    possible combination of angular momenta. **/
-
-    int
-        L,     // total angular momentum (from both species)
-        size,  // total number of elements in compound basis
-        n_sub, // number of subspaces - size of arrays below
-        lmaxA, // max. momentum for IPS for species A
-        lmaxB; // max. momentum for IPS for species B
-
-    // In a contiguous enumeration of the product space,
-    // the strides mark in which index  a  new  subspace
-    // begins, which are related to momenta of  A and  B
-    Iarray
-        strides;
-
-    struct _TensorProd_ht
-        * sub; // subspaces all possible Tensor product spaces
-};
-
-typedef struct _CompoundSpace * CompoundSpace;
 
 
 
@@ -53,15 +12,24 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
     Nb : Number of particles of species B
     lmaxA : maximum momentum for species A
     lmaxB : maximum momentum for species B
-    L : Total (combined) momentum from both species **/
+    L : Total (combined) momentum from both species
+    --------------------------------------------------------------------
+    The compound basis is build assembling an array of subspaces,  which
+    are characterized by one of the possible combination of  the  spaces
+    with fixed momentum La and Lb for each species, such that the sum of
+    both give us L. The subspaces are the tensor product of these  fixed
+    momentum spaces for every possible combination of La and Lb.     **/
 
     int
         i,
         j,
         La,
         Lb,
-        n_sub,
         size,
+        n_sub,
+        LboundA;
+
+    long
         MemReq;
 
     Iarray
@@ -73,22 +41,27 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
 
     S = (CompoundSpace) malloc(sizeof(struct _CompoundSpace));
     S->L = L;
+    S->Na = Na;
+    S->Nb = Nb;
     S->lmaxA = lmaxA;
     S->lmaxB = lmaxB;
+    LboundA = Na*lmaxA;
 
     // array to store the number of config.(size of individual basis)
     // for each species when sweeping through the possible values  of
     // the momentum. For bosons the values for 'La'  are in the range
     // - Na * lmax , ... , 0 , ... , Na * lmax. Once 'La' is fixed
     // we must have Lb = L - La
-    nc_a = iarrDef(2*Na*lmaxA+1);
-    nc_b = iarrDef(2*Na*lmaxA+1);
+    nc_a = iarrDef(2*LboundA+1);
+    nc_b = iarrDef(2*LboundA+1);
 
     i = 0;
     size = 0;
     n_sub = 0;
     MemReq = 0;
-    for (La = -Na*lmaxA; La <= Na*lmaxA; La++)
+    // COMPUTE THE SIZE OF THE SPACE  ENSURING
+    // THAT IT DO NOT EXCEED SYSTEM CAPABILITY
+    for (La = -LboundA; La <= LboundA; La++)
     {
         // Search for the possible combinations of momenta of spaces A and B
         Lb = L-La;
@@ -100,18 +73,20 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
             // coexist, they configure a subspace of the compound
             // system through the tensor product
             n_sub++; // Add counter of subspaces found
-            size = size + nc_a[i]*nc_b[i]; // size of compound basis updated
 
+            // Assess if it is possible the enumeration of the basis
             if (size > INT_MAX - nc_a[i]*nc_b[i])
             {
                 printf("\n\nINDEX ERROR : the structure for the basis ");
                 printf("of the compound multiconfig. basis cannot be ");
-                printf("indexed with 32-bit integers\n\n");
+                printf("indexed by 32-bit integers\n\n");
                 printf("Program aborted at function 'AllocCompBasis' ");
-                printf("in file 'mixtures.h'\n\n");
+                printf("in file 'LBoseBoseFockSpace.h'\n\n");
                 exit(EXIT_FAILURE);
             }
+            size = size + nc_a[i]*nc_b[i]; // size of compound basis updated
 
+            MemReq += sizeof(struct _TensorProd_ht);
             MemReq += (nc_a[i]*(2*lmaxA+1) + nc_b[i]*(2*lmaxB+1))*sizeof(int);
             if (MemReq > MEMORY_TOL)
             {
@@ -132,7 +107,7 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
     j = 0;
     i = 0;
     size = 0;
-    for (La = -Na*lmaxA; La <= Na*lmaxA; La++)
+    for (La = -LboundA; La <= LboundA; La++)
     {
         Lb = L-La;
         if (nc_a[i]*nc_b[i] > 0)
@@ -159,12 +134,12 @@ CompoundSpace AllocCompBasis(int Na, int Nb, int lmaxA, int lmaxB, int L)
 
 
 
-unsigned int EstimateMemory(CompoundSpace S)
+unsigned long EstimateMemory(CompoundSpace S)
 {
 
-/** Compute approximately the memory required to setup the config. space **/
+/** Compute approximately the memory required to set up the ccompound space **/
 
-    unsigned int
+    unsigned long
         j,
         sub_mem,
         mem_req,
@@ -216,7 +191,8 @@ void freeCompSpace(CompoundSpace S)
 void BBgetConfigs(int k, CompoundSpace S, Iarray occA, Iarray occB)
 {
 
-/** Setup in 'occA' and 'occB' the occupation numbers corresponding to 'k' **/
+/** Set up in 'occA' and 'occB' the occupation numbers corresponding to
+    configuration 'k' of the compound space 'S'                     **/
 
     int
         i,
@@ -248,8 +224,8 @@ void BBgetConfigs(int k, CompoundSpace S, Iarray occA, Iarray occB)
     {
         if (k < S->strides[j]) break;
     }
-    subIndex = j-1;
-    k = k - S->strides[j-1];
+    subIndex = j-1;             // subspace number
+    k = k - S->strides[j-1];    // subtract cost of accessing the subspace
 
     SubSizeA = S->sub[subIndex].sizeA;
     SubSizeB = S->sub[subIndex].sizeB;
@@ -276,6 +252,43 @@ void BBgetConfigs(int k, CompoundSpace S, Iarray occA, Iarray occB)
 
 
 
+int BBsubIndex(CompoundSpace S, Iarray occA)
+{
+
+/** From occupation numbers in 'occA' compute the angular momentum 'La'
+    and return the index of the subspace. The subspaces are sorted  as
+    increasing values of 'La'                                      **/
+
+    int
+        i,
+        n,
+        La,
+        Nla,
+        upper,
+        lower;
+
+    Nla = 2 * S->lmaxA + 1;
+    // Compute the momentum provided by config. A
+    La = 0;
+    for (i = 0; i < Nla; i++)
+    {
+        La = La + occA[i] * (i - S->lmaxA);
+    }
+    // find the subspace index
+    lower = 0;
+    upper = S->n_sub;
+    n = (upper + lower) / 2;
+    while(La != S->sub[n].La)
+    {
+        if (La > S->sub[n].La) lower = n;
+        else                   upper = n;
+        n = (upper + lower)/2;
+    }
+    return n;
+}
+
+
+
 int BBgetIndex(CompoundSpace S, Iarray occA, Iarray occB)
 {
 
@@ -287,16 +300,33 @@ int BBgetIndex(CompoundSpace S, Iarray occA, Iarray occB)
         ia,
         ib,
         La,
+        Lb,
         Nla,
+        Nlb,
         upper,
         lower;
 
     Nla = 2 * S->lmaxA + 1;
+    Nlb = 2 * S->lmaxB + 1;
 
+    // Compute the momentum provided by config. A
     La = 0;
     for (i = 0; i < Nla; i++)
     {
         La = La + occA[i] * (i - S->lmaxA);
+    }
+    // Compute the momentum provided by config. B
+    Lb = 0;
+    for (i = 0; i < Nlb; i++)
+    {
+        Lb = Lb + occB[i] * (i - S->lmaxB);
+    }
+    // Assert the combined momentum give the correct result
+    if (La + Lb != S->L)
+    {
+        printf("\n\nERROR : in function BBgetIndex the configurations ");
+        printf("provided break the momentum conservation\n\n");
+        exit(EXIT_FAILURE);
     }
 
     // First find the subspace index
@@ -314,6 +344,39 @@ int BBgetIndex(CompoundSpace S, Iarray occA, Iarray occB)
     ia = BgetIndex(S->lmaxA,S->sub[n].sizeA,S->sub[n].hta,occA);
     ib = BgetIndex(S->lmaxB,S->sub[n].sizeB,S->sub[n].htb,occB);
 
+    return S->strides[n] + ib*S->sub[n].sizeA + ia;
+}
+
+
+
+int BBgetIndex_A(CompoundSpace S, int n, int ib, Iarray occA)
+{
+
+/** Return the index of configuration using the  occupation  numbers
+    of species A with the subspace  index  'n'  and  index  of  some
+    configuration for species B. Useful for operators that act  only
+    in space A and conserves separately the momentum of both species **/
+
+    int
+        ia;
+
+    // Find the index in A hashing table
+    ia = BgetIndex(S->lmaxA,S->sub[n].sizeA,S->sub[n].hta,occA);
+    return S->strides[n] + ib*S->sub[n].sizeA + ia;
+}
+
+
+
+int BBgetIndex_B(CompoundSpace S, int n, int ia, Iarray occB)
+{
+
+/** Similar to 'BBgetIndex_A' **/
+
+    int
+        ib;
+
+    // Find the index in B hashing table
+    ib = BgetIndex(S->lmaxB,S->sub[n].sizeB,S->sub[n].htb,occB);
     return S->strides[n] + ib*S->sub[n].sizeA + ia;
 }
 
@@ -354,9 +417,13 @@ void PrintConfig(CompoundSpace S)
         printf("%d",j);
         if (i != j)
         {
-            printf("\n\nERROR : The Hashing function are wrong ! ");
+            printf("\n\nERROR : The Hashing function is wrong ! ");
             printf("Contact developer\n\n");
             exit(EXIT_FAILURE);
         }
     }
 }
+
+
+
+#endif

@@ -19,41 +19,47 @@ int main(int argc, char * argv[])
 
     int
         i,
-        nnz,
-        Npar, // number of particles
-        lmax, // number of orbitals
+        Npar_A, // number of particles
+        Npar_B, // number of particles
+        lmax_A, // number of orbitals
+        lmax_B, // number of orbitals
         totalL,
-        mcSize,
         lan_it,
+        mcSize,
         coefMemory,
         nthreads;
 
     double
         l,
-        g,
         E0,
         sum,
         real,
         imag,
         time_used;
 
-    Iarray
-        momentum;
+    double
+        g[3];
 
     Carray
         C,
-        Ho;
+        HoA,
+        HoB;
+
+    CompoundSpace
+        MixSpace;
 
     nthreads = omp_get_max_threads() / 2;
     omp_set_num_threads(nthreads);
 
-    if (argc != 5)
+    if (argc != 7)
     {
-        printf("\n\nERROR: Need four command line arguments");
-        printf("\n\t1. Number of particles");
-        printf("\n\t2. max. IPS angular momentum");
-        printf("\n\t3. Total angular momentum");
-        printf("\n\t4. Contact interaction strength\n\n");
+        printf("\n\nERROR: Need three integer numbers from command line");
+        printf("\n\t1. Number of particles of species A");
+        printf("\n\t2. Number of particles of species B");
+        printf("\n\t3. max. IPS angular momentum species A");
+        printf("\n\t4. max. IPS angular momentum species B");
+        printf("\n\t5. Total angular momentum");
+        printf("\n\t6. Interaction strength\n\n");
         exit(EXIT_FAILURE);
     }
 
@@ -62,25 +68,36 @@ int main(int argc, char * argv[])
     // NUMBER OF PARTICLES AND THE MAXIMUM  INDIVIDUAL  MOMENTUM
     // 'lmax' OF ORBITALS. FINALLY, GET THE INTERACTION STRENGTH
     // PARAMETER 'g'
-    sscanf(argv[1],"%d",&Npar);
-    sscanf(argv[2],"%d",&lmax);
-    sscanf(argv[3],"%d",&totalL);
-    sscanf(argv[4],"%lf",&g);
+    sscanf(argv[1],"%d",&Npar_A);
+    sscanf(argv[2],"%d",&Npar_B);
+    sscanf(argv[3],"%d",&lmax_A);
+    sscanf(argv[4],"%d",&lmax_B);
+    sscanf(argv[5],"%d",&totalL);
+    sscanf(argv[6],"%lf",&g[0]);
 
-    momentum = iarrDef(totalL+1);
-    for (i = 0; i <= totalL; i++)
+    printf("\nAssembling the configurational space ");
+    printf("...");
+
+    MixSpace = AllocCompBasis(Npar_A,Npar_B,lmax_A,lmax_B,totalL);
+    printf("\nConfigurational space successfully set up");
+    mcSize = MixSpace->size;
+
+    HoA = carrDef(2*lmax_A+1);
+    for (i = 0; i < 2*lmax_A+1; i++)
     {
-        momentum[i] = i;
+        l = 2 * PI * (i-lmax_A);
+        HoA[i] = 0.5*l*l;
     }
 
-    mcSize = BFixedMom_mcsize(Npar,lmax,totalL);
-
-    Ho = carrDef(2*lmax+1);
-    for (i = 0; i < 2*lmax+1; i++)
+    HoB = carrDef(2*lmax_B+1);
+    for (i = 0; i < 2*lmax_B+1; i++)
     {
-        l = 2 * PI * (i-lmax);
-        Ho[i] = 0.5*l*l;
+        l = 2 * PI * (i-lmax_B);
+        HoB[i] = 0.5*l*l;
     }
+
+    g[1] = g[0];
+    g[2] = 0;
 
     // define an initial guess for Lanczos tridiagonal decomposition
     C = carrDef(mcSize);
@@ -99,8 +116,7 @@ int main(int argc, char * argv[])
     {
         lan_it = mcSize - 1;
         time_used = omp_get_wtime(); // trigger to measure time
-        E0 = GROUND_STATE(lan_it,Npar,lmax,totalL,C,Ho,g);
-        // groundScanning(lan_it,Npar,lmax,momentum,totalL+1,Ho,g,"test.dat");
+        E0 =  BOSEBOSE_GS(lan_it,MixSpace,C,HoA,HoB,g);
         time_used = omp_get_wtime() - time_used; // finish time measure
     }
     else
@@ -114,20 +130,18 @@ int main(int argc, char * argv[])
         else
         {
             lan_it = 10;
-            while (lan_it*coefMemory < 2*MEMORY_TOL && lan_it < 500)
+            while (lan_it*coefMemory < 2*MEMORY_TOL && lan_it < 300)
             {
                 lan_it += 10;
             }
         }
 
         time_used = omp_get_wtime(); // trigger to measure time
-        E0 = GROUND_STATE(lan_it,Npar,lmax,totalL,C,Ho,g);
-        // E0 = IMAGTIME(1000,0.01,Npar,lmax,totalL,C,Ho,g);
-        // MOMENTUM_SCAN(lan_it,Npar,lmax,momentum,totalL+1,Ho,g,"test.dat");
+        E0 =  BOSEBOSE_GS(lan_it,MixSpace,C,HoA,HoB,g);
         time_used = omp_get_wtime() - time_used; // finish time measure
     }
 
-    printf("\n\nGround state energy per particle : %.10lf ",E0/Npar);
+    printf("\n\nGround state energy per particle : %.10lf ",E0/(Npar_A+Npar_B));
     printf("(with %d Lanczos iterations)",lan_it);
     printf("\nTime to compute ground state (with %d threads) : ",nthreads);
     printf("%.1lf(s)",time_used);
@@ -135,8 +149,9 @@ int main(int argc, char * argv[])
     printf("\n\nDone.\n\n");
 
     free(C);
-    free(Ho);
-    free(momentum);
+    free(HoA);
+    free(HoB);
+    freeCompSpace(MixSpace);
 
     return 0;
 }

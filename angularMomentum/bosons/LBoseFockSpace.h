@@ -3,8 +3,6 @@
 
 #include "BoseFockSpace.h"
 
-#define MEMORY_TOL 1E9
-
 
 
 int positiveMomentum(int M, Iarray occ)
@@ -164,10 +162,12 @@ int BFixedMom_mcsize(int N, int lmax, int totalL)
         MemReq = Nconf * (2 * lmax + 1) * sizeof(int);
         if (MemReq > MEMORY_TOL)
         {
-            printf("\n\nPROCESS ABORTED : When computing the size of ");
-            printf("the multiconfg. space the estimated memory demanded ");
-            printf("to set the hashing table exceeded the tolerance ");
-            printf("of %.1lf\n\n",((double) MEMORY_TOL)/1E9);
+            printf("\n\nPROCESS ABORTED : When computing the size of the ");
+            printf("multiconfg. space, the approximated memory demanded ");
+            printf("to set the hashing table for %d particles ",N);
+            printf("subject to lmax = %d is ",lmax);
+            printf("%.1lf\n",((double) MEMORY_TOL)/1E9);
+            printf("Stopped at function 'BFixedMom_mcsize'\n\n");
             exit(EXIT_FAILURE);
         }
     }
@@ -318,6 +318,12 @@ Iarray * BAssembleHT(int N, int lmax, int totalL, int mcsize)
     Iarray
         * htable;
 
+    if (mcsize == 0)
+    {
+        printf("\n\nWARNING : empty hashing table allocation requested ");
+        printf("with %d particles, |l_max| = %d and L = %d\n\n",N,lmax,totalL);
+    }
+
     // Allocate the hashing table. The number of IPS is 2*lmax+1
     htable = (Iarray *) malloc(mcsize*sizeof(int *));
     for (i = 0; i < mcsize; i++) htable[i] = iarrDef(2*lmax+1);
@@ -362,13 +368,24 @@ Iarray * BAssembleHT(int N, int lmax, int totalL, int mcsize)
 int BgetIndex(int lmax, int ht_size, Iarray * ht, Iarray occ)
 {
 
-/** Search in the hashing table a configuration and RETURN its index **/
+/** Search in the hashing table a configuration and RETURN its index
+    The algorithm assumes an ordering implied by the construction of
+    the hashing table(ht). In the way the ht was set, First one need
+    to compare the occupations in positive momentum IPS,  where  the
+    ordering is increasing according to number of particles  in  IPS
+    with higher momentum. Second, one need to compare occupations in
+    negative momentum IPS. This step involves the recursion part, as
+    such, the states with larger occupations in most negative moment
+    IPS appear first and later the ones with larger occupations near
+    the l = 0 IPS **/
 
     int
         i,
         n,
         lower,
         upper;
+
+    if (lmax == 0) return 0; // only one single particle state
 
     lower = 0;
     upper = ht_size;

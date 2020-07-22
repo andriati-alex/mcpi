@@ -48,18 +48,19 @@ int main(int argc, char * argv[])
     sscanf(argv[4],"%d",&lmax_B);
     sscanf(argv[5],"%d",&totalL);
 
-    printf("\nConfiguring the configurational space ....\n");
+    printf("\nAssembling the configurational space ");
+    printf("...");
 
     start = clock(); // trigger to measure time
     S = AllocCompBasis(Npar_A,Npar_B,lmax_A,lmax_B,totalL);
     end = clock();   // finish time measure
     time_direct = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("\nConfigurational space successfully setup in ");
+    printf("\nConfigurational space successfully set up in ");
     if (time_direct > 0.1) printf("%.1lf(s).",time_direct);
     else                   printf("%.0lf(ms).",time_direct*1000);
     printf("\nThere are %d states with L = %d | ",S->size,totalL);
     mem_reqGB = ((double) EstimateMemory(S))/1E9;
-    printf("Estimated memory required %.3lf(GB)",mem_reqGB);
+    printf("Estimated memory needed %.3lf(GB)",mem_reqGB);
     mem_reqGB = ((double) S->size * sizeof(double complex))/1E9;
     printf("\nEach Vector State in this basis cost %.3lf(GB)",mem_reqGB);
 

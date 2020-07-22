@@ -16,103 +16,7 @@ of possibilities to fit indistinguishable balls in different boxes.
 
 ****/
 
-#include <complex.h>
-#include <limits.h>
-#include <stdlib.h>
-#include <stdio.h>
-
-
-
-// Vector of integer numbers
-typedef int * Iarray;
-
-// Vector of real numbers
-typedef double * Rarray;
-
-// Vector of complex numbers
-typedef double complex * Carray;
-
-// Matrix of complex numbers
-typedef double complex ** Cmatrix;
-
-
-
-
-
-Rarray rarrDef(unsigned int n)
-{
-    double * ptr;
-
-    ptr = (double * ) malloc( n * sizeof(double) );
-
-    if (ptr == NULL)
-    {
-        printf("\n\nMEMORY ERROR : malloc fail for double");
-        printf(" Size requested : %ld double\n\n",n);
-        exit(EXIT_FAILURE);
-    }
-
-    return ptr;
-}
-
-
-
-Carray carrDef(unsigned int n)
-{
-    double complex * ptr;
-
-    ptr = (double complex * ) malloc( n * sizeof(double complex) );
-
-    if (ptr == NULL)
-    {
-        printf("\n\nMEMORY ERROR : malloc fail for complex.");
-        printf(" Size requested : %ld double complex\n\n",n);
-        exit(EXIT_FAILURE);
-    }
-
-    return ptr;
-}
-
-
-
-Iarray iarrDef(unsigned int n)
-{
-    int * ptr;
-
-    ptr = (int * ) malloc( n * sizeof(int) );
-
-    if (ptr == NULL)
-    {
-        printf("\n\nMEMORY ERROR : malloc fail for integer.");
-        printf(" Size requested : %ld integers\n\n",n);
-        exit(EXIT_FAILURE);
-    }
-
-    return ptr;
-}
-
-
-
-Cmatrix cmatDef(unsigned int m, unsigned int n)
-{
-
-    int i;
-
-    double complex ** ptr;
-
-    ptr = (double complex ** ) malloc( m * sizeof(double complex *) );
-
-    if (ptr == NULL)
-    {
-        printf("\n\nMEMORY ERROR : malloc fail for (complex *)");
-        printf(" Requested %d double pointers to complex\n\n",m);
-        exit(EXIT_FAILURE);
-    }
-
-    for (i = 0; i < m; i++) ptr[i] = carrDef(n);
-
-    return ptr;
-}
+#include "StandardAuxiliarLib.h"
 
 
 
@@ -130,6 +34,13 @@ int NC(int N, int M)
 
     n = 1;
     j = 2;
+
+    // No place to put the particles
+    if (M == 0)
+    {
+        printf("\n\nERROR : 0 single particle states given !\n\n");
+        exit(EXIT_FAILURE);
+    }
 
     if  (M > N)
     {
@@ -183,38 +94,6 @@ int NC(int N, int M)
 
 
 
-Iarray setupNCmat(int N, int M)
-{
-
-/** Matrix of all possible outcomes from NC function  with
-    NCmat[i + N*j] = NC(i,j), where i <= N and j <= M, the
-    number of particles and states respectively.
-
-    This is an auxiliar structure to avoid calls of  NC
-    function many times when converting Fock states  to
-    indexes **/
-
-    int
-        i,
-        j;
-
-    Iarray
-        NCmat;
-
-    NCmat = iarrDef((M + 1) * (N + 1));
-
-    for (i = 0; i < N + 1; i++)
-    {
-        NCmat[i + (N+1)*0] = 0;
-        NCmat[i + (N+1)*1] = 1;
-        for (j = 2; j < M + 1; j++) NCmat[i + (N+1)*j] = NC(i,j);
-    }
-
-    return NCmat;
-}
-
-
-
 void indexToConfig(int k, int N, int M, Iarray v)
 {
 
@@ -247,7 +126,7 @@ void indexToConfig(int k, int N, int M, Iarray v)
 
 
 
-int configToIndex(int N, int M, Iarray NCmat, Iarray v)
+int configToIndex(int N, int M, Iarray v)
 {
 
 /** Convert an occupation vector v to a integer number between
@@ -257,11 +136,9 @@ int configToIndex(int N, int M, Iarray NCmat, Iarray v)
     int
         i,
         k,
-        n,
-        col;
+        n;
 
     k = 0;
-    col = N + 1;
 
     // Empty one by one orbital starting from the last one
     for (i = M - 1; i > 0; i--)
@@ -270,7 +147,7 @@ int configToIndex(int N, int M, Iarray NCmat, Iarray v)
 
         while (n > 0)
         {
-            k = k + NCmat[N + col*i]; // number of combinations needed
+            k = k + NC(N,i); // number of combinations needed
             N = N - 1; // decrease total # of particles
             n = n - 1; // decrease # of particles in current state
         }

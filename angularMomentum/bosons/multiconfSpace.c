@@ -1,5 +1,5 @@
 #include <time.h>
-#include "HMatrix.h"
+#include "Hamiltonian.h"
 
 
 
@@ -119,9 +119,7 @@ int main(int argc, char * argv[])
     time_direct = ((double) (end - start)) / CLOCKS_PER_SEC;
     printf(" Done !");
 
-    // COMPUTE IN A NAIVE WAY FIRST ASSEMBLING THE
-    // THE HASHING TABLE WITHOUT RESTRICTIOS
-
+    // COMPUTE IN A NAIVE WAY WITHOUT RESTRICTIONS
     nc = NC(Npar,2*lmax+1); // Size of config. without restrictions
     if (nc*sizeof(int) < MEMORY_TOL)
     {
@@ -152,7 +150,7 @@ int main(int argc, char * argv[])
 
 
     // SHOW ON THE SCREEN SOME CONFIG. IF THERE ARE NOT TOO MANY
-    if (mcSize < 500)
+    if (mcSize < 500 && mcSize > 0)
     {
         printf("\n\nConfigurations with ang. momentum L = %d and",totalL);
         printf(" max(l) = %d\n",lmax);
@@ -204,11 +202,11 @@ int main(int argc, char * argv[])
     }
 
     printf("\n\n\n");
-    printf("\t*****************************************************\n");
-    printf("\t*                                                   *\n");
-    printf("\t*        SOME MULTICONFIG. SPACE INFORMATION        *\n");
-    printf("\t*                                                   *\n");
-    printf("\t*****************************************************\n");
+    printf("\t******************************************************\n");
+    printf("\t*                                                    *\n");
+    printf("\t*        SOME MULTICONFIG. SPACE INFORMATIONS        *\n");
+    printf("\t*                                                    *\n");
+    printf("\t******************************************************\n");
     printf("\n\n\n");
 
     printf("There are %d Fock states with L = %d",mcSize,totalL);
@@ -221,7 +219,7 @@ int main(int argc, char * argv[])
     }
     else
     {
-        printf("\nSparse matrix Hamiltonian exceeded allowed memory ");
+        printf("\nSparse matrix Hamiltonian would exceed allowed memory ");
         printf("%.1lf(GB)",MEMORY_TOL/1E9);
     }
     printf("\n\nMemory required for the:\n");
@@ -230,7 +228,7 @@ int main(int argc, char * argv[])
     l = ((double) mcSize*(2*lmax+1) + nc)*sizeof(int)/1E6;
     printf("\tmulticonfig. space naively using all config. : %.1lf(Mb)\n",l);
     l = ((double) mcSize * sizeof(double complex))/1E6;
-    printf("\tA many-body state : %.1lf(Mb)\n",l);
+    printf("\tA many-body state in config. basis : %.1lf(Mb)\n",l);
     if (nnz > 0)
     {
         l = ((double)(nnz+mcSize)*sizeof(int)+nnz*sizeof(double complex))/1E6;
