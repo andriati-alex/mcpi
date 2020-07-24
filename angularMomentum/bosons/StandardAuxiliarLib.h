@@ -100,6 +100,22 @@ Iarray iarrDef(unsigned int n)
 
 
 
+Farray farrDef(unsigned int n)
+{
+    char * ptr;
+
+    ptr = (char * ) malloc(n*sizeof(char));
+    if (ptr == NULL)
+    {
+        printf("\n\nMEMORY ERROR : malloc fail for array of char.");
+        printf(" Size requested : %ld\n\n",n*sizeof(char));
+        exit(EXIT_FAILURE);
+    }
+    return ptr;
+}
+
+
+
 Cmatrix cmatDef(unsigned int m, unsigned int n)
 {
 
@@ -175,6 +191,50 @@ double carrNorm(int n, Carray v)
         mod = mod + creal(v[i]) * creal(v[i]) + cimag(v[i]) * cimag(v[i]);
     }
     return sqrt(mod);
+}
+
+
+
+int assert_BoseNocc(int Norbs, int Npar, Iarray occ)
+{
+
+/** Auxiliar function to assess if the occupation numbers are valid, i.e
+    no negative entries and conserving the total number of particles **/
+
+    int
+        i,
+        N;
+
+    N = 0;
+    for (i = 0; i < Norbs; i++)
+    {
+        if (occ[i] < 0) return 0;
+        N = N + occ[i];
+    }
+    if (N != Npar) return 0;
+    return 1; // Everything fine
+}
+
+
+
+int assert_FermiNocc(int Norbs, int Npar, Farray occ)
+{
+
+/** Auxiliar function to assess if the occupation numbers are valid, i.e
+    no negative entries and conserving the total number of particles **/
+
+    int
+        i,
+        N;
+
+    N = 0;
+    for (i = 0; i < Norbs; i++)
+    {
+        if (occ[i] < 0 || occ[i] > 1) return 0;
+        N = N + occ[i];
+    }
+    if (N != Npar) return 0;
+    return 1; // Everything fine
 }
 
 

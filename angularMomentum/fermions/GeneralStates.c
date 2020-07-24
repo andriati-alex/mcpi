@@ -58,7 +58,7 @@ int main(int argc, char * argv[])
         Npar, // number of particles
         Morb; // number of orbitals
 
-    Iarray
+    Farray
         IFmat;
 
     if (argc != 3)
@@ -80,13 +80,13 @@ int main(int argc, char * argv[])
         exit(EXIT_FAILURE);
     }
 
-    nc = NC(Npar,Morb);
+    nc = NCF(Npar,Morb);
 
-    printf("\n\nNumber of particles : %3d", Npar);
-    printf(  "\nNumber of orbitals  : %3d", Morb);
+    printf("\n\nNumber of particles : %d", Npar);
+    printf(  "\nNumber of orbitals  : %d", Morb);
     printf(  "\nNumber of configurations : %d", nc);
 
-    IFmat = setupFocks(Npar,Morb);
+    IFmat = FsetupConfigHT(Npar,Morb);
     printf("\n\n\n");
 
     if (nc < PRINT_TOL)
@@ -105,13 +105,13 @@ int main(int argc, char * argv[])
                 for (j = 0; j < Morb; j++) printf("%d",IFmat[j+i*Morb]);
                 printf(" ]");
 
-                k = FockToIndex(Npar,Morb,&IFmat[Morb*i]);
+                k = FconfigToIndex(Npar,Morb,&IFmat[Morb*i]);
                 if (k != i)
                 {
                     // Self consistency check,  if  the  Fock  state in the
                     // hashing table that was constructed using IndexToFock
                     // function gives the correc index when converted  back
-                    printf("\n\nERROR: Wrong map from FockToIndex\n\n");
+                    printf("\n\nERROR: Wrong map from FconfigToIndex\n\n");
                     exit(EXIT_FAILURE);
                 }
 
@@ -148,13 +148,13 @@ int main(int argc, char * argv[])
             for (j = 0; j < Morb - 1; j++) printf(" %3d  ,",IFmat[j+i*Morb]);
             printf(" %3d  ]", IFmat[Morb - 1 + i*Morb]);
 
-            k = FockToIndex(Npar,Morb,&IFmat[Morb*i]);
+            k = FconfigToIndex(Npar,Morb,&IFmat[Morb*i]);
             if (k != i)
             {
                 // Self consistency check, if the Fock state in the
                 // hashing table that was constructed using IndexToFock
                 // function gives the correc index when converted back
-                printf("\n\nERROR: Wrong map from FockToIndex\n\n");
+                printf("\n\nERROR: Wrong map from FconfigToIndex\n\n");
             }
 
             k = 0;

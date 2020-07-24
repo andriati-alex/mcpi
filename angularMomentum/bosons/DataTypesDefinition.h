@@ -17,6 +17,7 @@
 
 
 typedef int * Iarray;               // Vector of integer numbers
+typedef char * Farray;              // Integer numbers for Fermi occ.
 typedef double * Rarray;            // Vector of real numbers
 typedef double complex * Carray;    // Vector of complex numbers
 typedef double complex ** Cmatrix;  // Matrix of complex numbers
@@ -84,6 +85,51 @@ struct _CompoundSpace
         * sub; // subspaces all possible Tensor product spaces
 };
 typedef struct _CompoundSpace * CompoundSpace;
+
+
+
+struct _BFTensorProd_ht
+{
+/** The Tensor product of two spaces with specific momentum La
+    for species A and Lb for species B is a  subspace  of  the
+    general combined space with momentum L = Lb + Lf       **/
+    int
+        Lb,     // momentum of config. space Bosons
+        Lf,     // momentum of config. space Fermions
+        sizeB,  // multiconfig. space size Bosons
+        sizeF;  // multiconfig. space size Fermions
+    Iarray
+        * htb;  // hashing table for config. of Bosons
+    Farray
+        * htf;  // hashing table for config. of Fermions
+};
+typedef struct _BFTensorProd_ht * BFTensorProd_ht;
+
+
+
+struct _BFCompoundSpace
+{
+/** The compound space is design by selecting the momenta in  integer
+    units separately for species B and F, such that  Lb + Lf = L.  In
+    this way, it is possible to define an array of subspaces for each
+    possible combination of angular momenta of each species       **/
+    int
+        L,     // total angular momentum (from both species)
+        Nb,
+        Nf,
+        size,  // total number of elements in compound basis
+        n_sub, // number of subspaces - size of arrays below
+        lmaxB, // max. momentum for Bosons   single particle states
+        lmaxF; // max. momentum for Fermions single particle states
+    // In a contiguous enumeration of the product space,
+    // the strides mark in which index  a  new  subspace
+    // begins, which are related to momenta of  B and  F
+    Iarray
+        strides;
+    struct _BFTensorProd_ht
+        * sub; // subspaces all possible Tensor product spaces
+};
+typedef struct _BFCompoundSpace * BFCompoundSpace;
 
 
 

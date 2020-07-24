@@ -133,7 +133,14 @@ int main(int argc, char * argv[])
             SCANNING(Njobs,fname_prefix);
             break;
         case 2:
-            MIXTURE_SCANNING(Njobs,fname_prefix);
+            if (typeB == 'F' || typeB == 'f')
+            {
+                BOSEFERMI_SCANNING(Njobs,fname_prefix);
+            }
+            else
+            {
+                MIXTURE_SCANNING(Njobs,fname_prefix);
+            }
             break;
     }
     time_used = omp_get_wtime() - time_used; // finish time measure

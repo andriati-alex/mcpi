@@ -21,25 +21,25 @@ int NaiveSetup(unsigned int Npar, unsigned int Morb, int L)
         count,
         totalMom;
 
-    Iarray
-        general_ht,
-        HTindexes,
+    Farray
+        occ,
         ht;
 
-    count = 0;
-    nc = NC(Npar,Morb);
-    HTindexes = iarrDef(nc);
+    Iarray
+        HTindexes;
 
-    // first setup a hashing table for the general problem without
-    // fixing the angular momentum required in the argument 'L'
-    general_ht = setupFocks(Npar,Morb);
+    count = 0;
+    nc = NCF(Npar,Morb);
+    occ = farrDef(Morb);
+    HTindexes = iarrDef(nc);
 
     for (n = 0; n < nc; n++)
     {
+        FindexToConfig(n,Npar,Morb,occ);
         totalMom = 0;
         for (i = 0; i < Morb; i++)
         {
-            totalMom = totalMom + (i - Morb/2)*general_ht[i+n*Morb];
+            totalMom = totalMom + (i - Morb/2)*occ[i];
         }
 
         // Update the numbering of Fock states
@@ -52,18 +52,15 @@ int NaiveSetup(unsigned int Npar, unsigned int Morb, int L)
         }
     }
 
-    ht = iarrDef(count*Morb);
-
+    ht = farrDef(count*Morb);
     // Copy the configurations that satisfy the momentum required
     for (n = 0; n < count; n++)
     {
-        for (i = 0; i < Morb; i++)
-        {
-            ht[i + n*Morb] = general_ht[i + HTindexes[n]*Morb];
-        }
+        FindexToConfig(HTindexes[n],Npar,Morb,occ);
+        for (i = 0; i < Morb; i++) ht[i+n*Morb] = occ[i];
     }
 
-    free(HTindexes); free(ht); free(general_ht);
+    free(HTindexes); free(ht); free(occ);
     return count;
 }
 
@@ -90,7 +87,7 @@ int main(int argc, char * argv[])
         start,
         end;
 
-    Iarray
+    Farray
         * ht;
 
     if (argc != 4)
@@ -124,8 +121,8 @@ int main(int argc, char * argv[])
 
     // COMPUTE IN A NAIVE WAY FIRST ASSEMBLING THE
     // THE HASHING TABLE WITHOUT RESTRICTIOS
-    nc = NC(Npar,2*lmax+1); // Size of config. without restrictions
-    if (nc*(2*lmax+1)*sizeof(int) < 1E9)
+    nc = NCF(Npar,2*lmax+1); // Size of config. without restrictions
+    if (nc*sizeof(int) < 1E9)
     {
         start = clock(); // trigger to measure time
         k = NaiveSetup(Npar,2*lmax+1,totalL);
@@ -154,7 +151,7 @@ int main(int argc, char * argv[])
     {
         if (2*lmax+1 > 7)
         {
-            printf("\n\nWARNING: LARGE SYSTEM CAN MESS UP THE OUTPUT -> ");
+            printf("\n\nWARNING: MANY SINGLE PARTICLE STATES -> ");
             printf("COMPACT PRINTING\n\n");
 
             printf(" Conf_index    Occupations as binary");
@@ -233,7 +230,7 @@ int main(int argc, char * argv[])
     printf("\nMemory required constraining the momentum : %.1lf(Mb)",
             ((double) mcSize*(2*lmax+1)*sizeof(int))/1E6);
     printf("\nMemory required naively using all config. : %.1lf(Mb)",
-            ((double) (mcSize + nc)*(2*lmax+1) + nc)*sizeof(int)/1E6);
+            ((double) mcSize*(2*lmax+1) + nc)*sizeof(int)/1E6);
 
     for (i = 0; i < mcSize; i++) free(ht[i]);
     free(ht);

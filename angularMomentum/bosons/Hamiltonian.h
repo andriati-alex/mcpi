@@ -6,6 +6,7 @@
 #endif
 
 #include "LBoseBoseFockSpace.h"
+#include "LBoseFermiFockSpace.h"
 
 
 
@@ -1133,6 +1134,261 @@ void mixture_actH(CompoundSpace S, Carray HoA, Carray HoB, double g [],
         }
 
         free(vA); free(vB);
+    }
+}
+
+
+
+void bosefermi_actH(BFCompoundSpace S, Carray HoB, Carray HoF, double g [],
+                    Carray Cin, Carray Cout)
+{
+
+/** ROUTINE TO APPLY HAMILTONIAN IN A STATE EXPRESSED IN CONFIG. BASIS
+    WITH MOMENTUM CONSERVATION AND CONTACT INTERACTION  IN  1D  FOR  A
+    MIXTURE OF TWO BOSONS AND FERMIONS
+    ------------------------------------------------------------------
+    Given the one-body matrices elements (diagonal only)  in  single
+    particle momentum basis 'HoB' and 'HoF', the contact interacting
+    strength parameters 'g' sorted as gbb, gff and gbf, act with the
+    Hamiltonian in a state expressed by its coefficients  'Cin'  and
+    record the result in 'Cout'.  'S' is the structure corresponding
+    to the basis of the two component system.                    **/
+
+    int
+        i,
+        j,
+        k,
+        l,
+        s,
+        q,
+        n,
+        iB,
+        iF,
+        up,
+        low,
+        Nlb,
+        Nlf,
+        fermif;
+    unsigned int
+        threadId,
+        nthreads;
+    double
+        gb,
+        gbf,
+        bosef;
+    double complex
+        w,
+        zb,
+        zbf;
+    Iarray
+        vB;
+    Farray
+        vF;
+
+    Nlb = 2 * S->lmaxB + 1; // total number of single particle states Bosons
+    Nlf = 2 * S->lmaxF + 1; // total number of single Particle States Fermions
+
+    // There is no Fermi-Fermi contact interaction
+    gb = g[0];
+    gbf = g[2];
+
+    #pragma omp parallel private(i,j,k,s,q,l,n,iB,iF,up,low,bosef,fermif,\
+                                 w,zb,zbf,vB,vF,threadId,nthreads)
+    {
+        threadId = omp_get_thread_num();
+        nthreads = omp_get_num_threads();
+
+        vB = iarrDef(Nlb);  // vector of occupation numbers
+        vF = farrDef(Nlf);
+
+        for (i = threadId; i < S->size; i += nthreads)
+        {
+            w = 0;
+            zb = 0;
+            zbf = 0;
+
+            // copy current configuration occupations
+            BFgetConfigs(i,S,vB,vF);
+
+            // Intraspecies interactions neither change the subspace
+            // nor influence the individual hashing index.
+            n = BFsubIndex(S,vB);
+            iF = FgetIndex(S->lmaxF,S->sub[n].sizeF,S->sub[n].htf,vF);
+
+            // KINECT ENERGY - creation and annihilation at k
+            for (k = 0; k < Nlb; k++) w = w + HoB[k]*vB[k]*Cin[i];
+            for (k = 0; k < Nlf; k++) w = w + HoF[k]*vF[k]*Cin[i];
+
+
+
+            /************************************************************
+             **                                                        **
+             **                                                        **
+             **                INTERACTION AMONG BOSONS                **
+             **                                                        **
+             **                                                        **
+             ************************************************************/
+
+            // Rule : Creation on k k / Annihilation on k k
+            for (k = 0; k < Nlb; k++)
+            {
+                bosef = vB[k] * (vB[k] - 1);
+                zb = zb + gb * bosef * Cin[i];
+            }
+            // Rule : Creation on k s / Annihilation on k s
+            for (k = 0; k < Nlb; k++)
+            {
+                if (vB[k] < 1) continue;
+                for (s = k + 1; s < Nlb; s++)
+                {
+                    bosef = vB[k] * vB[s];
+                    zb = zb + 4 * gb * bosef * Cin[i];
+                }
+            }
+            // Rule : Creation on k k / Annihilation on q l
+            // ONLY IN CASE q + l = 2 * k
+            for (k = 0; k < Nlb; k++)
+            {
+                if (vB[k] < 2) continue;
+                for (q = 0; q < Nlb; q++)
+                {
+                    l = 2 * k - q;
+                    // Avoid repeating/forbidden rules
+                    if (q == k || l < 0 || l >= q) continue;
+                    // compute bosonic factor from op. action
+                    bosef = sqrt((double)vB[k]*(vB[k]-1)*(vB[q]+1)*(vB[l]+1));
+                    // assemble the configuration according to action of op.
+                    vB[k] -= 2;
+                    vB[l] += 1;
+                    vB[q] += 1;
+                    // Compute col index in 'j'
+                    // j = BBgetIndex(S,vA,vB);
+                    j = BFgetIndex_B(S,n,iF,vB);
+                    // factor 2 counts for the symmetry q-l
+                    // justifying the choice for only l > q
+                    zb = zb + 2 * gb * bosef * Cin[j];
+                    // correct the configuration
+                    vB[k] += 2;
+                    vB[l] -= 1;
+                    vB[q] -= 1;
+                }
+            }
+            // Rule : Creation on k s / Annihilation on q q
+            // ONLY IN CASE k + s = 2 * q
+            for (q = 0; q < Nlb; q++)
+            {
+                for (k = 0; k < Nlb; k++)
+                {
+                    // Avoid repeating/forbidden rules
+                    s = 2 * q - k;
+                    if (q == k || s < 0 || s >= k) continue;
+                    if (vB[k] < 1 || vB[s] < 1) continue;
+                    // compute bosonic factor from op. action
+                    bosef = sqrt((double)vB[k]*vB[s]*(vB[q]+1)*(vB[q]+2));
+                    // assemble the configuration according to action of op.
+                    vB[k] -= 1;
+                    vB[s] -= 1;
+                    vB[q] += 2;
+                    // Compute col index 'j'
+                    // j = BBgetIndex(S,vA,vB);
+                    j = BFgetIndex_B(S,n,iF,vB);
+                    // factor 2 counts for the symmetry k-s
+                    zb = zb + 2 * gb * bosef * Cin[j];
+                    vB[k] += 1;
+                    vB[s] += 1;
+                    vB[q] -= 2;
+                }
+            }
+            // Rule : Creation on k s / Annihilation on q l
+            // ONLY IN CASE k + s = q + l
+            for (k = 0; k < Nlb; k++)
+            {
+                if (vB[k] < 1) continue;
+                for (s = k + 1; s < Nlb; s++)
+                {
+                    if (vB[s] < 1) continue;
+                    for (q = 0; q < Nlb; q++)
+                    {
+                        if (q == s || q == k) continue;
+                        l = k + s - q;
+                        if (l < 0 || l >= q ) continue;
+
+                        bosef = sqrt((double)vB[k]*vB[s]*(vB[q]+1)*(vB[l]+1));
+                        vB[k] -= 1;
+                        vB[s] -= 1;
+                        vB[q] += 1;
+                        vB[l] += 1;
+                        // j = BBgetIndex(S,vA,vB);
+                        j = BFgetIndex_B(S,n,iF,vB);
+                        zb = zb + 4 * gb * bosef * Cin[j];
+                        vB[k] += 1;
+                        vB[s] += 1;
+                        vB[q] -= 1;
+                        vB[l] -= 1;
+
+                    }       // Finish q
+                }           // Finish s
+            }               // Finish k
+
+
+
+            /************************************************************
+             **                                                        **
+             **                                                        **
+             **                INTERSPECIES INTERACTION                **
+             **                                                        **
+             **                                                        **
+             ************************************************************/
+            for (s = 0; s < Nlf; s++)
+            {
+                for (k = 0; k < Nlb; k++)
+                {
+                    // NO MOMENTUM EXCHANGED
+                    bosef = vB[k]*vF[s];
+                    zbf = zbf + gbf * bosef * Cin[i];
+
+                    // MOMENTUM EXCHANGED BY q UNITS
+                    if (s + k < Nlf) low = -k;
+                    else             low = -(Nlf - 1 - s);
+                    if (k + s < Nlb) up = s;
+                    else             up = Nlb-1-k;
+                    for(q = low; q <= up; q++)
+                    {
+                        // Avoid case of without momentum exchanged
+                        if (q == 0) continue;
+                        // avoid unpopulated states and creation on
+                        // already occupied fermionic state
+                        if (vB[k+q]*vF[s-q] == 0 || vF[s] > 0) continue;
+                        bosef  = sqrt((double)vB[k+q]*(vB[k]+1));
+                        // fermi factor is taken into account moving the
+                        // operators and inverting sign at each crossing
+                        fermif = 1;
+                        for (l = 0; l < s-q; l++)
+                        {
+                            if (vF[l] == 1) fermif = (-1)*fermif;
+                        }
+                        for (l = 0; l < s; l++)
+                        {
+                            if (vF[l] == 1) fermif = (-1)*fermif;
+                        }
+                        vB[k+q] -= 1;
+                        vB[k]   += 1;
+                        vF[s-q] -= 1;
+                        vF[s]   += 1;
+                        j = BFgetIndex(S,vB,vF);
+                        zbf = zbf + gbf * bosef * Cin[j];
+                        vB[k+q] += 1;
+                        vB[k]   -= 1;
+                        vF[s-q] += 1;
+                        vF[s]   -= 1;
+                    }
+                }
+            }
+
+            Cout[i] = w + zb/2 + zbf;
+        }
+
+        free(vF); free(vB);
     }
 }
 

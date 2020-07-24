@@ -1,16 +1,7 @@
 #ifndef _FermiFockSpace_h
 #define _FermiFockSpace_h
 
-
-
-/****   AUTHOR INFORMATION
-
- NAME : Alex Valerio Andriati
- AFFILIATION : University of Sao Paulo - Brazil
-
- Last update : July/01/2020
-
- COMMENTS
+/****   CONFIGURATIONAL SPACE FOR FERMIONS WITHOUT RESTRICTIONS
 
  Basic routines to setup the multiconfiguration space. Functions to setup a
  *hashing table*, convert configuration to index and index to configuration
@@ -23,123 +14,7 @@
  
 ****/
 
-
-
-#include <limits.h>
-#include <complex.h>
-#include <stdlib.h>
-#include <stdio.h>
-
-// Vector of real numbers
-typedef double * Rarray;
-
-// Vector of complex numbers
-typedef double complex * Carray;
-
-// Matrix of complex numbers
-typedef double complex ** Cmatrix;
-
-// Vector of integer numbers
-typedef int * Iarray;
-
-// Vector of integer numbers
-typedef char * Farray;
-
-
-
-
-
-Rarray rarrDef(unsigned int n)
-{
-    double * ptr;
-
-    ptr = (double * ) malloc( n * sizeof(double) );
-
-    if (ptr == NULL)
-    {
-        printf("\n\nMEMORY ERROR : malloc fail for double. ");
-        printf("Size required : %d\n\n",n);
-        exit(EXIT_FAILURE);
-    }
-
-    return ptr;
-}
-
-
-
-Carray carrDef(unsigned int n)
-{
-    double complex * ptr;
-
-    ptr = (double complex * ) malloc( n * sizeof(double complex) );
-
-    if (ptr == NULL)
-    {
-        printf("\n\nMEMORY ERROR : malloc fail for complex. ");
-        printf("Size required : %d\n\n",n);
-        exit(EXIT_FAILURE);
-    }
-
-    return ptr;
-}
-
-
-
-Iarray iarrDef(unsigned int n)
-{
-    int * ptr;
-
-    ptr = (int * ) malloc( n * sizeof(int) );
-
-    if (ptr == NULL)
-    {
-        printf("\n\nMEMORY ERROR : malloc fail for integer.");
-        printf(" Size requested : %ld\n\n", n * sizeof(int));
-        exit(EXIT_FAILURE);
-    }
-
-    return ptr;
-}
-
-
-
-Farray farrDef(unsigned int n)
-{
-    char * ptr;
-
-    ptr = (char * ) malloc( n * sizeof(char) );
-
-    if (ptr == NULL)
-    {
-        printf("\n\nMEMORY ERROR : malloc fail for array of char.");
-        printf(" Size requested : %ld\n\n", n * sizeof(char));
-        exit(EXIT_FAILURE);
-    }
-
-    return ptr;
-}
-
-
-
-Cmatrix cmatDef(unsigned int m, unsigned int n)
-{
-
-    int i;
-
-    double complex ** ptr;
-
-    ptr = (double complex ** ) malloc( m * sizeof(double complex *) );
-
-    if (ptr == NULL)
-    {
-        printf("\n\nMEMORY ERROR : malloc fail for (complex *)\n\n");
-        exit(EXIT_FAILURE);
-    }
-
-    for (i = 0; i < m; i++) ptr[i] = carrDef(n);
-
-    return ptr;
-}
+#include "StandardAuxiliarLib.h"
 
 
 

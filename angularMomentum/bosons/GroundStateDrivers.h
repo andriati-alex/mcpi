@@ -337,6 +337,112 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
 
 
 
+double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
+                    Carray HoF, double g [])
+{
+
+/** COMPUTE GROUND STATE OF BOSE-FERMI MIXTURE USING LANCZOS
+    INPUT/OUTPUT : C input guess / output ground state in config. basis
+    RETURN : Lowest eigenvalue found **/
+
+    int
+        i,
+        k,
+        j,
+        nc,
+        predictedIter;
+
+    double
+        GSenergy;
+
+    Rarray
+        d,
+        e,
+        eigvec;
+
+    Carray
+        diag,
+        offdiag;
+
+    Cmatrix
+        lvec;
+
+    printf("\n * EVALUATING GROUND STATE OF TWO SPECIES BOSONIC MIXTURE\n");
+
+    nc = MixSpace->size;
+    if (MixSpace->size == 1)
+    {
+        // In this case there must be only one config. because there
+        // is only one single particle state for each species
+        diag = carrDef(1);
+        C[0] = 1;
+        bosefermi_actH(MixSpace,HoB,HoF,g,C,diag);
+        GSenergy = creal(C[0]*diag[0]);
+        free(diag);
+        return GSenergy;
+    }
+
+    // variables to call LAPACK routine. eigvec matrix is stored in
+    // a vector in row major order
+    d = rarrDef(Niter);
+    e = rarrDef(Niter);
+    eigvec = rarrDef(Niter * Niter);
+    // output of lanczos iterative method - Tridiagonal decomposition
+    diag = carrDef(Niter);
+    offdiag = carrDef(Niter);
+    offdiag[Niter-1] = 0;
+    // Lanczos Vectors (organized by rows of the following matrix)
+    lvec = cmatDef(Niter,nc);
+    // initiate date to call lanczos. The first vector is the input guess
+    for (i = 0; i < nc; i++) lvec[0][i] = C[i];
+
+    /***   CALL LANCZOS   ***/
+    predictedIter = Niter;
+    Niter = LNCZS_BFMIX(Niter,MixSpace,HoB,HoF,g,diag,offdiag,lvec);
+    // Transfer data to use lapack routine
+    for (k = 0; k < Niter; k++)
+    {
+        d[k] = creal(diag[k]);    // Supposed to be real
+        e[k] = creal(offdiag[k]); // Supposed to be real
+        for (j = 0; j < Niter; j++) eigvec[k * Niter + j] = 0;
+    }
+
+    /***   CALL LAPACK FOR TRIDIAGONAL LANCZOS OUTPUT   ***/
+    k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
+    if (k != 0)
+    {
+        printf("\n\nERROR IN DIAGONALIZATION\n\n");
+        if (k < 0) printf("Illegal value in parameter %d\n\n",-k);
+        else       printf("Algorithm failed to converge\n\n");
+        exit(EXIT_FAILURE);
+    }
+
+    GSenergy = d[0];
+    j = 0;
+    // Update C with the coefficients of ground state
+    for (i = 0; i < nc; i++)
+    {
+        C[i] = 0;
+        for (k = 0; k < Niter; k++)
+        {
+            C[i] = C[i] + lvec[k][i] * eigvec[k * Niter + j];
+        }
+    }
+
+    free(d);
+    free(e);
+    free(eigvec);
+    free(diag);
+    free(offdiag);
+    // free matrices
+    for (i = 0; i < predictedIter; i++) free(lvec[i]);
+    free(lvec);
+
+    return GSenergy;
+}
+
+
+
 double IMAGTIME(int Nsteps, double dt, int Npar, int lmax, int total_mom,
                 Carray C, Carray Ho, double g)
 {
@@ -723,6 +829,114 @@ void MIXTURE_SCANNING(int n_cases, char prefix [])
         free(HoB);
         fclose(out_file);
         freeCompSpace(MixSpace);
+    }
+}
+
+
+
+void BOSEFERMI_SCANNING(int n_cases, char prefix [])
+{
+    int
+        i,
+        j,
+        nc,
+        NparB,
+        lmaxB,
+        NparF,
+        lmaxF,
+        lan_it,
+        total_mom,
+        coefMemory;
+
+    double
+        l,
+        E0;
+
+    double
+        g[3];
+
+    char
+        strnum[10],
+        in_fname[100],
+        out_fname[100];
+
+    Carray
+        C,
+        HoB,
+        HoF;
+
+    FILE
+        * out_file;
+
+    BFCompoundSpace
+        MixSpace;
+
+    // set up file name with input data
+    strcpy(in_fname,prefix);
+    strcat(in_fname,".inp");
+
+    for (i = 0; i < n_cases; i++)
+    {
+        // number of line as string to append in output file name
+        sprintf(strnum,"%d",i+1);
+        // set up parameters of config. space from line 'i' of input file
+        MixParLine(in_fname,i,&NparB,&lmaxB,&NparF,&lmaxF,&total_mom,g);
+        MixSpace = BoseFermiBasis(NparB,NparF,lmaxB,lmaxF,total_mom);
+        nc = MixSpace->size;
+        printf("\n\n\nCOMPUTING GROUND STATE(BOSE-FERMI) %d/%d\n",i+1,n_cases);
+        printf("%d Bosons in lmax = %d | ",NparB,lmaxB);
+        printf("%d Fermions in lmax = %d | ",NparF,lmaxF);
+        printf("L = %d | space size = %d\n",total_mom,nc);
+        printf("Interaction gb = %.10lf | gbf = %.10lf",g[0],g[2]);
+        sepline();
+        // set up (default)  number of Lanczos iterations
+        // respecting the memory allowed (MEMORY_TOL) and
+        // maximum number of iterations (MAX_LNCZS_IT)
+        coefMemory = nc * sizeof(double complex);
+        if (nc > MAX_LNCZS_IT)
+        {
+            lan_it = 2;
+            while (lan_it*coefMemory < MEMORY_TOL && lan_it < MAX_LNCZS_IT)
+            {
+                lan_it++;
+            }
+        }
+        else lan_it = nc; // Small config. space
+        // set up one-body matrix elements
+        HoB = carrDef(2*lmaxB+1);
+        for (j = 0; j < 2*lmaxB+1; j++)
+        {
+            l = 2 * PI * (j-lmaxB);
+            HoB[j] = 0.5*l*l;
+        }
+        HoF = carrDef(2*lmaxF+1);
+        for (j = 0; j < 2*lmaxF+1; j++)
+        {
+            l = 2 * PI * (j-lmaxF);
+            HoF[j] = 0.5*l*l;
+        }
+        // initialize many-body state coefficients
+        C = carrDef(nc);
+        initGuess(nc,C);
+        // call routine for the ground state
+        E0 = BOSEFERMI_GS(lan_it,MixSpace,C,HoB,HoF,g);
+        printf("\nAverage energy per particle = %.10lf",E0/(NparB+NparF));
+        // WRITE OUTPUT DATA IN A FILE
+        // set up file name with output data
+        strcpy(out_fname,"output/");
+        strcat(out_fname,prefix);
+        strcat(out_fname,"_job");
+        strcat(out_fname,strnum);
+        strcat(out_fname,".dat");
+        // open output file
+        out_file = openFileWrite(out_fname);
+        fprintf(out_file,"(%.12E+0.0j)",E0/(NparB+NparF));
+        carrAppend(out_file,nc,C);
+        free(C);
+        free(HoB);
+        free(HoF);
+        fclose(out_file);
+        freeBoseFermiSpace(MixSpace);
     }
 }
 

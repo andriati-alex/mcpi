@@ -5,7 +5,7 @@
 
 
 
-int positiveMomentum(int M, Farray occ)
+int FpositiveMomentum(int M, Farray occ)
 {
 
 /** given the occupations 'occ' in the IPS with  angular  momentum  l >= 0,
@@ -163,7 +163,7 @@ int FFixedMom_mcsize(int N, int lmax, int totalL)
         for (i = 0; i < posNC; i++)
         {
             FindexToConfig(i,N-N0,M,occ_Lp);
-            Lp = positiveMomentum(M,occ_Lp);
+            Lp = FpositiveMomentum(M,occ_Lp);
             // Use the remaining particles  'N0' to search for occupations
             // in negative momentum IPS that combined with the occupations
             // in positive momentum  'occ_Lp' give total momentum 'totalL'
@@ -335,7 +335,7 @@ Farray * FAssembleHT(int N, int lmax, int totalL, int mcsize)
         for (i = 0; i < posNC; i++)
         {
             FindexToConfig(i,N-N0,M,occ);
-            L = positiveMomentum(M,occ);
+            L = FpositiveMomentum(M,occ);
             // Use the remaining particles  'N0' to search for occupations
             // in negative momentum IPS that combined with the occupations
             // in positive momentum  'occ_Lp' give total momentum 'totalL'
