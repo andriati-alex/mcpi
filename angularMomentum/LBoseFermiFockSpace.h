@@ -282,7 +282,7 @@ int BFsubIndex(BFCompoundSpace S, Iarray occB)
 int BFgetIndex(BFCompoundSpace S, Iarray occB, Farray occF)
 {
 
-/** Return the index of the tensor product of 'occA' with 'occB' **/
+/** Return the index of the tensor product of 'occB' with 'occF' **/
 
     int
         i,
@@ -303,7 +303,15 @@ int BFgetIndex(BFCompoundSpace S, Iarray occB, Farray occF)
         printf("\n\nERROR: In operations computing Hamiltonian action the ");
         printf("following occupation numbers for Fermions are not valid \n");
         for (i = 0; i < Nlf; i++) printf(" %d",occF[i]);
-        printf("\n\n");
+        printf("\n\nProgram aborted at function 'BFgetIndex'\n\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!assert_BoseNocc(Nlb,S->Nb,occB))
+    {
+        printf("\n\nERROR: In operations computing Hamiltonian action the ");
+        printf("following occupation numbers for Bosons are not valid \n");
+        for (i = 0; i < Nlb; i++) printf(" %d",occB[i]);
+        printf("\n\nProgram aborted at function 'BFgetIndex'\n\n");
         exit(EXIT_FAILURE);
     }
 

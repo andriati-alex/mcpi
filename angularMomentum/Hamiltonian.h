@@ -1343,11 +1343,12 @@ void bosefermi_actH(BFCompoundSpace S, Carray HoB, Carray HoF, double g [],
             {
                 for (k = 0; k < Nlb; k++)
                 {
-                    // NO MOMENTUM EXCHANGED
+                    // NO MOMENTUM EXCHANGED CONTRIBUTION
                     bosef = vB[k]*vF[s];
                     zbf = zbf + gbf * bosef * Cin[i];
 
-                    // MOMENTUM EXCHANGED BY q UNITS
+                    // MOMENTUM EXCHANGED BY q UNITS STILL INSIDE
+                    // THE MULTICONFIGURATIONAL SPACE DEFINED
                     if (s + k < Nlf) low = -k;
                     else             low = -(Nlf - 1 - s);
                     if (k + s < Nlb) up = s;
@@ -1359,28 +1360,30 @@ void bosefermi_actH(BFCompoundSpace S, Carray HoB, Carray HoF, double g [],
                         // avoid unpopulated states and creation on
                         // already occupied fermionic state
                         if (vB[k+q]*vF[s-q] == 0 || vF[s] > 0) continue;
+                        // result of bosonic operators action
                         bosef  = sqrt((double)vB[k+q]*(vB[k]+1));
+                        vB[k+q] -= 1;
+                        vB[k]   += 1;
                         // fermi factor is taken into account moving the
                         // operators and inverting sign at each crossing
+                        // among them until find the right place
                         fermif = 1;
                         for (l = 0; l < s-q; l++)
                         {
                             if (vF[l] == 1) fermif = (-1)*fermif;
                         }
+                        vF[s-q] = 0;
                         for (l = 0; l < s; l++)
                         {
                             if (vF[l] == 1) fermif = (-1)*fermif;
                         }
-                        vB[k+q] -= 1;
-                        vB[k]   += 1;
-                        vF[s-q] -= 1;
-                        vF[s]   += 1;
+                        vF[s] = 1;
                         j = BFgetIndex(S,vB,vF);
                         zbf = zbf + gbf * bosef * Cin[j];
                         vB[k+q] += 1;
-                        vB[k]   -= 1;
-                        vF[s-q] += 1;
-                        vF[s]   -= 1;
+                        vB[k] -= 1;
+                        vF[s-q] = 1;
+                        vF[s] = 0;
                     }
                 }
             }

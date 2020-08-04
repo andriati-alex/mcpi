@@ -19,6 +19,7 @@
 typedef int * Iarray;               // Vector of integer numbers
 typedef char * Farray;              // Integer numbers for Fermi occ.
 typedef double * Rarray;            // Vector of real numbers
+typedef double ** Rmatrix;          // Matrix of real numbers
 typedef double complex * Carray;    // Vector of complex numbers
 typedef double complex ** Cmatrix;  // Matrix of complex numbers
 

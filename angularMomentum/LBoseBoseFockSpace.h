@@ -308,6 +308,23 @@ int BBgetIndex(CompoundSpace S, Iarray occA, Iarray occB)
 
     Nla = 2 * S->lmaxA + 1;
     Nlb = 2 * S->lmaxB + 1;
+    // assert the 'occA' and 'occB' belong to the input multiconfig. space
+    if (!assert_BoseNocc(Nla,S->Na,occA))
+    {
+        printf("\n\nERROR: In operations computing Hamiltonian action the ");
+        printf("following occupation numbers for Bosons are not valid \n");
+        for (i = 0; i < Nla; i++) printf(" %d",occA[i]);
+        printf("\n\nProgram aborted at function 'BBgetIndex'\n\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!assert_BoseNocc(Nlb,S->Nb,occB))
+    {
+        printf("\n\nERROR: In operations computing Hamiltonian action the ");
+        printf("following occupation numbers for Bosons are not valid \n");
+        for (i = 0; i < Nlb; i++) printf(" %d",occB[i]);
+        printf("\n\nProgram aborted at function 'BBgetIndex'\n\n");
+        exit(EXIT_FAILURE);
+    }
 
     // Compute the momentum provided by config. A
     La = 0;

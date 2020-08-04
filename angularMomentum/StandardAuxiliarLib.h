@@ -19,6 +19,16 @@ void sepline()
 
 
 
+void LAPACK_PROBLEM(int k, char funcName [])
+{
+    printf("\n\nERROR IN LAPACK CALL IN FUNCTION %s\n\n",funcName);
+    if (k < 0) printf("Illegal value in LAPACK_dstev parameter %d\n\n",-k);
+    else       printf("LAPACK_dstev algorithm failed to converge\n\n");
+    exit(EXIT_FAILURE);
+}
+
+
+
 void TimePrint(double t)
 {
     
@@ -116,6 +126,25 @@ Farray farrDef(unsigned int n)
 
 
 
+Rmatrix rmatDef(unsigned int m, unsigned int n)
+{
+
+    int i;
+
+    double ** ptr;
+
+    ptr = (double ** ) malloc(m * sizeof(double *));
+    if (ptr == NULL)
+    {
+        printf("\n\nMEMORY ERROR : malloc fail for real matrix\n\n");
+        exit(EXIT_FAILURE);
+    }
+    for (i = 0; i < m; i++) ptr[i] = rarrDef(n);
+    return ptr;
+}
+
+
+
 Cmatrix cmatDef(unsigned int m, unsigned int n)
 {
 
@@ -132,6 +161,26 @@ Cmatrix cmatDef(unsigned int m, unsigned int n)
     }
     for (i = 0; i < m; i++) ptr[i] = carrDef(n);
     return ptr;
+}
+
+
+
+void cmatFree(unsigned int m, Cmatrix M)
+{
+    int
+        i;
+    for (i = 0; i < m; i++) free(M[i]);
+    free(M);
+}
+
+
+
+void rmatFree(unsigned int m, Rmatrix M)
+{
+    int
+        i;
+    for (i = 0; i < m; i++) free(M[i]);
+    free(M);
 }
 
 
@@ -191,6 +240,53 @@ double carrNorm(int n, Carray v)
         mod = mod + creal(v[i]) * creal(v[i]) + cimag(v[i]) * cimag(v[i]);
     }
     return sqrt(mod);
+}
+
+
+
+void carrNormalize(unsigned int n, Carray v)
+{
+
+/** Normalize vector v accorsing to L2 norm **/
+
+    int
+        i;
+    double
+        norm;
+    norm = carrNorm(n,v);
+    for (i = 0; i < n; i++) v[i] = v[i] / norm;
+}
+
+
+
+double rarrNorm(unsigned int n, Rarray x)
+{
+
+/** Conventional L2 norm of real vectors **/
+
+    int
+        i;
+    double
+        sum;
+
+    sum = 0;
+    for (i = 0; i < n; i++) sum = sum + x[i]*x[i];
+    return sqrt(sum);
+}
+
+
+
+void rarrNormalize(unsigned int n, Rarray x)
+{
+
+/** Normalize vector x accorsing to L2 norm **/
+
+    int
+        i;
+    double
+        norm;
+    norm = rarrNorm(n,x);
+    for (i = 0; i < n; i++) x[i] = x[i] / norm;
 }
 
 
@@ -339,6 +435,61 @@ unsigned int NumberOfLines(char fname [])
     }
     fclose(arq);
     return i;
+}
+
+
+
+void rmatBlockMult(int n, int init, Rmatrix A, Rmatrix B, Rmatrix AB)
+{
+
+/** Perform the matrix multiplication of A(left) with B(right),
+    both square,  beginning at index 'init' (lower right block)  **/
+
+    int
+        i,
+        j,
+        l;
+
+    double
+        x;
+
+    for (i = init; i < n; i++)
+    {
+        for (j = init; j < n; j++)
+        {
+            x = 0;
+            for (l = init; l < n; l++) x = x + A[i][l]*B[l][j];
+            AB[i][j] = x;
+        }
+    }
+}
+
+
+
+void rmatTranspose(int n, Rmatrix A, Rmatrix AT)
+{
+    int
+        i,
+        j;
+
+    for (i = 0; i < n; i++)
+    {
+        for (j = 0; j < n; j++) AT[i][j] = A[j][i];
+    }
+}
+
+
+
+void rmatCopy(int n, int init, Rmatrix inp, Rmatrix out)
+{
+    int
+        i,
+        j;
+
+    for (i = init; i < n; i++)
+    {
+        for (j = init; j < n; j++) out[i][j] = inp[i][j];
+    }
 }
 
 
