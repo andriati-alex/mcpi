@@ -494,4 +494,121 @@ void rmatCopy(int n, int init, Rmatrix inp, Rmatrix out)
 
 
 
+void QR_rec(int dim, int init, Rmatrix A, Rmatrix Qstep, Rmatrix Q, Rmatrix aux)
+{
+
+/** RECURSIVE IMPLEMENTATION USING HOUSEHOLDER REFLECTIONS FOLLOWING
+    WIKIPEDIA CONVENTIONS. IT IS WORTH CONSULTING STOER AND BULIRSCH
+    SEC. 3.7 (MORE SPECIFICALLY PAGES 227-228)                   **/
+
+    int
+        i,
+        j,
+        n;
+
+    double
+        alpha;
+
+    Rarray
+        x;
+
+    if (init == dim-1) return;
+
+    n = dim-init;   // dimension of bulk matrix A'
+    x = rarrDef(n); // vector for new Q computation
+    for (j = init; j < dim; j++) x[j-init] = A[j][init];
+    if (x[0] < 0) alpha = rarrNorm(n,x);
+    else          alpha = - rarrNorm(n,x);
+    x[0] = x[0] - alpha; // update to get 'u'
+    rarrNormalize(n,x);  // normalize it to get 'v'
+    // SETUP NEW Q in 'Qstep'
+    for (i = 0; i < init; i++)
+    {
+        Qstep[i][i] = 1;
+        for (j = i+1; j < dim; j++)
+        {
+            Qstep[i][j] = 0;
+            Qstep[j][i] = 0;
+        }
+    }
+    for (i = init; i < dim; i++)
+    {
+        Qstep[i][i] = 1.0 - 2 * x[i-init]*x[i-init];
+        for (j = i+1; j < dim; j++)
+        {
+            Qstep[i][j] = - 2 * x[i-init]*x[j-init];
+            Qstep[j][i] = - 2 * x[j-init]*x[i-init];
+        }
+    }
+    rmatBlockMult(dim,0,Qstep,Q,aux);   // one new multiplication
+    rmatCopy(dim,0,aux,Q);              // update final Q
+    rmatBlockMult(dim,init,Qstep,A,aux);
+    rmatCopy(dim,init,aux,A);
+    free(x);
+    QR_rec(dim,init+1,A,Qstep,Q,aux);
+}
+
+
+
+void QRdecomp(unsigned int dim, Rmatrix A, Rmatrix Q)
+{
+
+/** RECURSIVE IMPLEMENTATION USING HOUSEHOLDER REFLECTIONS FOLLOWING
+    WIKIPEDIA CONVENTIONS. IT IS WORTH CONSULTING STOER AND BULIRSCH
+    SEC. 3.7 (MORE SPECIFICALLY PAGES 227-228)
+    ================================================================
+    Input  : Real square matrix 'A' and its dimension 'dim'
+    Output : Real square matrix 'Q' which have orthonormal columns
+    In the computations the input matrix 'A' is destroyed since it
+    is used as workspace memory                                  **/
+
+    int
+        i,
+        j;
+
+    double
+        alpha;
+
+    Rarray
+        x;
+
+    Rmatrix
+        Qstep,
+        aux;
+
+    if (dim < 2) return;
+
+    aux = rmatDef(dim,dim);
+    Qstep = rmatDef(dim,dim);
+
+    x = rarrDef(dim);       // vector for Q computation
+    for (j = 0; j < dim; j++) x[j] = A[j][0]; // copy the first column
+    if (x[0] < 0) alpha = rarrNorm(dim,x);
+    else          alpha = - rarrNorm(dim,x);
+    x[0] = x[0] - alpha;    // update to get 'u'
+    rarrNormalize(dim,x);   // normalize it to get 'v'
+    // SETUP FIRST Q TO INITIATE RECURSION
+    for (i = 0; i < dim; i++)
+    {
+        Q[i][i] = 1.0 - 2 * x[i]*x[i];
+        for (j = i+1; j < dim; j++)
+        {
+            Q[i][j] = - 2 * x[i]*x[j];
+            Q[j][i] = - 2 * x[j]*x[i];
+        }
+    }
+    free(x);
+    rmatBlockMult(dim,0,Q,A,aux);
+    rmatCopy(dim,0,aux,A);
+    QR_rec(dim,1,A,Qstep,Q,aux); // Finish recursive part
+    // Final step - transpose
+    rmatCopy(dim,0,Q,aux);
+    rmatTranspose(dim,aux,Q);
+    // Free memory
+    rmatFree(dim,aux);
+    rmatFree(dim,Qstep);
+}
+
+
+
 #endif

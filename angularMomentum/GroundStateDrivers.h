@@ -689,12 +689,13 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
     // to the variations in ground state energy below tolerance.
     // if not the system is possibly not in the ground state yet
     // thus call imaginary time evolution
+    /*
     if (nc > MAX_LNCZS_IT && Niter == predictedIter)
     {
         dt = 0.1 * (1.0 / GSenergy);
         Nsteps = 1000;
         GSenergy = MIXTURE_IMAGTIME(Nsteps,dt,MixSpace,C,HoA,HoB,g);
-    }
+    }*/
 
     return GSenergy;
 }
