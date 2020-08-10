@@ -11,7 +11,7 @@
 void sepline()
 {
 
-/** print in current screen a separation line **/
+/** print in the screen a separation line **/
 
     printf("\n=======================================");
     printf("=======================================\n");
@@ -407,8 +407,8 @@ void carrAppend(FILE * f, int M, Carray v)
         real = creal(v[j]);
         imag = cimag(v[j]);
 
-        if (imag >= 0) fprintf(f, "\n(%.15E+%.15Ej)", real, imag);
-        else           fprintf(f, "\n(%.15E%.15Ej)", real, imag);
+        if (imag >= 0) fprintf(f, "\n(%.15E+%.15Ej)",real,imag);
+        else           fprintf(f, "\n(%.15E%.15Ej)",real,imag);
     }
 }
 
@@ -490,6 +490,31 @@ void rmatCopy(int n, int init, Rmatrix inp, Rmatrix out)
     {
         for (j = init; j < n; j++) out[i][j] = inp[i][j];
     }
+}
+
+
+
+unsigned int numericalIdentityMatrix(int n, Rmatrix M)
+{
+/** Return boolean 1 if the matrix M is the Identity matrix in numerical
+    precision and 0 otherwise. Default tolerance is 10^(-12) for the avg
+    of the absolute valued of non diagonal elements                  **/
+    int
+        i,
+        j;
+    double
+        offdiag;
+
+    offdiag = 0;
+    for (i = 0; i < n; i++)
+    {
+        for (j = i+1; j < n; j++)
+        {
+            offdiag = offdiag + (fabs(M[i][j]) + fabs(M[j][i]))/n;
+        }
+    }
+    if (offdiag > 1E-12) return 0;
+    return 1;
 }
 
 

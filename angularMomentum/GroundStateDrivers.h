@@ -506,6 +506,10 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
         return GSenergy;
     }
 
+    // In the case the system is too large that the memory required
+    // exceeded the tolerance, apply implicit restarts
+    if (nc > MAX_LNCZS_IT && Niter < MAX_LNCZS_IT) Niter = 20;
+
     // variables to call LAPACK routine. eigvec matrix is stored in
     // a vector in row major order
     d = rarrDef(Niter);
@@ -520,14 +524,10 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
     // initiate date to call lanczos. The first vector is the input guess
     for (i = 0; i < nc; i++)  lvec[0][i] = C[i];
 
-
-
     /***   CALL LANCZOS ITERATIONS   ***/
     predictedIter = Niter;
     if (H == NULL) Niter = LNCZS_HACT(Niter,nc,lmax,ht,Ho,g,diag,offdiag,lvec);
     else           Niter = LNCZS_HMAT(Niter,nc,H,diag,offdiag,lvec);
-
-
 
     // Transfer data to use lapack routine
     for (k = 0; k < Niter; k++)
@@ -537,19 +537,9 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
         for (j = 0; j < Niter; j++) eigvec[k * Niter + j] = 0;
     }
 
-
-
     /***   CALL LAPACK FOR TRIDIAGONAL MATRIX FROM LANCZOS OUTPUT   ***/
     k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
-    if (k != 0)
-    {
-        printf("\n\nERROR IN DIAGONALIZATION\n\n");
-        if (k < 0) printf("Illegal value in parameter %d\n\n",-k);
-        else       printf("Algorithm failed to converge\n\n");
-        exit(EXIT_FAILURE);
-    }
-
-
+    if (k != 0)  LAPACK_PROBLEM(k,"BOSEBOSE_GS");
 
     GSenergy = d[0];
     j = 0;
@@ -628,6 +618,10 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
         return GSenergy;
     }
 
+    // In the case the system is too large that the memory required
+    // exceeded the tolerance, apply implicit restarts
+    if (nc > MAX_LNCZS_IT && Niter < MAX_LNCZS_IT) Niter = 20;
+
     // variables to call LAPACK routine. eigvec matrix is stored in
     // a vector in row major order
     d = rarrDef(Niter);
@@ -656,13 +650,7 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
 
     /***   CALL LAPACK FOR TRIDIAGONAL LANCZOS OUTPUT   ***/
     k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
-    if (k != 0)
-    {
-        printf("\n\nERROR IN DIAGONALIZATION\n\n");
-        if (k < 0) printf("Illegal value in parameter %d\n\n",-k);
-        else       printf("Algorithm failed to converge\n\n");
-        exit(EXIT_FAILURE);
-    }
+    if (k != 0)  LAPACK_PROBLEM(k,"BOSEBOSE_GS");
 
     GSenergy = d[0];
     j = 0;
@@ -747,6 +735,10 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
         return GSenergy;
     }
 
+    // In the case the system is too large that the memory required
+    // exceeded the tolerance, apply implicit restarts
+    if (nc > MAX_LNCZS_IT && Niter < MAX_LNCZS_IT) Niter = 20;
+
     // variables to call LAPACK routine. eigvec matrix is stored in
     // a vector in row major order
     d = rarrDef(Niter);
@@ -774,13 +766,7 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
 
     /***   CALL LAPACK FOR TRIDIAGONAL LANCZOS OUTPUT   ***/
     k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
-    if (k != 0)
-    {
-        printf("\n\nERROR IN DIAGONALIZATION\n\n");
-        if (k < 0) printf("Illegal value in parameter %d\n\n",-k);
-        else       printf("Algorithm failed to converge\n\n");
-        exit(EXIT_FAILURE);
-    }
+    if (k != 0)  LAPACK_PROBLEM(k,"BOSEFERMI_GS");
 
     GSenergy = d[0];
     j = 0;
@@ -988,7 +974,7 @@ void MIXTURE_SCANNING(int n_cases, char prefix [])
         E0 = BOSEBOSE_GS(lan_it,MixSpace,C,HoA,HoB,g);
         printf("\nAverage energy per particle = %.10lf",E0/(NparA+NparB));
         // WRITE OUTPUT DATA IN A FILE
-        // set up file name with output data
+        // set up file name
         strcpy(out_fname,"output/");
         strcat(out_fname,prefix);
         strcat(out_fname,"_job");
@@ -996,7 +982,7 @@ void MIXTURE_SCANNING(int n_cases, char prefix [])
         strcat(out_fname,".dat");
         // open output file
         out_file = openFileWrite(out_fname);
-        fprintf(out_file,"(%.12E+0.0j)",E0/(NparA+NparB));
+        fprintf(out_file,"(%.9E+0.0j)",E0/(NparA+NparB));
         carrAppend(out_file,nc,C);
         free(C);
         free(HoA);

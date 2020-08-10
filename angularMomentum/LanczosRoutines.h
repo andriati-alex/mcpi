@@ -75,7 +75,7 @@ int stopLanczos(int Niter, Carray diag, Carray offdiag, double * previousE)
     printf("\nRelativeError : %.7lf",err);
 
     // if (1.0 - d[0]/(*previousE) < LNCZS_STOP_TOL) shallStop = 1;
-    if (err < 10*LNCZS_STOP_TOL) shallStop = 1;
+    if (err < LNCZS_STOP_TOL) shallStop = 1;
     *previousE = d[0];
     free(d);
     free(e);
@@ -162,6 +162,16 @@ void updateTrid(int kp, Carray diag, Carray offdiag, Rmatrix Q)
         diag[i] = A[i][i];
         offdiag[i] = A[i][i+1];
     }
+
+/*  UNCOMMENT THIS SECTION TO PRINT NEW TRIDIAGONAL BLOCK MATRIX TO RESTART
+    printf("\n\nTransformed tridiagonal Matrix\n\n");
+    for (i = 0; i < kp; i++)
+    {
+        printf("\n");
+        for (j = 0; j < kp; j++) printf("%10.1E",A[i][j]);
+    }
+    printf("\n\n");
+*/
 
     rmatFree(kp,A);
     rmatFree(kp,QT);
@@ -284,6 +294,16 @@ void impRestart(int nc, int kp, Cmatrix lvec, Carray diag, Carray offdiag,
         rmatCopy(kp,0,Qk,A);
     }
 
+    // assert the matrix Q matrix from all QR-decomposition is unitary
+    rmatTranspose(kp,Q,Qk);
+    rmatBlockMult(kp,0,Qk,Q,aux);
+    if (!numericalIdentityMatrix(kp,aux))
+    {
+        printf("\n\nERROR : Matrix Q in Lanczos restart is not unitary ");
+        printf("according to numerical precision\n\n");
+        exit(EXIT_FAILURE);
+    }
+
     // UPDATE/RESTART tridiagonal system and Lanczos vectors
     updateLvec(nc,kp,lvec,Q);
     updateTrid(kp,diag,offdiag,Q);
@@ -295,6 +315,16 @@ void impRestart(int nc, int kp, Cmatrix lvec, Carray diag, Carray offdiag,
     {
         f[i] = offdiag[k-1] * lvec[k][i] + f[i] * beta * Q[kp-1][k-1];
     }
+
+/*  UNCOMMENT THIS SECTION TO PRINT Q MATRIX
+    printf("\n\nResult of all QR-decomp. multiplications\n\n");
+    for (i = 0; i < kp; i++)
+    {
+        printf("\n");
+        for (j = 0; j < kp; j++) printf("%10.1E",Q[i][j]);
+    }
+    printf("\n\n");
+*/
 
     rmatFree(kp,A);
     rmatFree(kp,Q);
@@ -455,13 +485,16 @@ int LNCZS_HACT(int lm, int nc, int lmax, Iarray * ht, Carray Ho, double g,
         i,
         j,
         k,
+        Npar,
+        Niter,
         threadId,
         nthreads;
 
     double
         tol,
         maxCheck,
-        energy;
+        energy,
+        extraB;
 
     double complex
         hc_update;
@@ -472,6 +505,12 @@ int LNCZS_HACT(int lm, int nc, int lmax, Iarray * ht, Carray Ho, double g,
 
     printf("\nLANCZOS ITERATIONS\n");
     printf(" * Progress");
+
+    Niter = 0;
+
+    // Compute Number of particles
+    Npar = 0;
+    for (i = 0; i < 2 * lmax + 1; i++) Npar = Npar + ht[0][i];
 
     // Check for a source of breakdown in the algorithm to do not
     // divide by zero. Instead of zero use  a  tolerance (tol) to
@@ -501,7 +540,7 @@ int LNCZS_HACT(int lm, int nc, int lmax, Iarray * ht, Carray Ho, double g,
             free(HC);
             free(ortho);
             printf("\n\nWARNING : BREAKDOWN OCCURRED IN LANCZOS METHOD ");
-            printf("WITHOUT USING HAMILTONIAN MATRIX\n\n");
+            printf("WITHOUT USING HAMILTONIAN MATRIX FOR 1 SPECIE\n\n");
             return i;
         }
 
@@ -517,16 +556,20 @@ int LNCZS_HACT(int lm, int nc, int lmax, Iarray * ht, Carray Ho, double g,
 
         diag[i + 1] = carrDot(nc,lvec[i + 1],HC);
 
+        // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
         if ((i+1) % 10 == 0)
         {
             if (stopLanczos(i+1,diag,offdiag,&energy))
             {
+                printf(" | Energy per particle : %.7lf",energy/Npar);
                 free(HC);
                 free(ortho);
-                printf("\nACHIEVED CONVERGENCE FOR GROUND STATE ENERGY\n");
+                printf("\n============= FINISHED LANCZOS ITERATIONS\n");
                 return i+1;
             }
+            printf(" | Energy per particle : %.7lf",energy/Npar);
         }
+        // -------------------------------------------------------
 
         for (j = 0; j < nc; j++)
         {
@@ -555,10 +598,99 @@ int LNCZS_HACT(int lm, int nc, int lmax, Iarray * ht, Carray Ho, double g,
             }
         }
 
+        Niter++;
         printf("\n  %3d/%d",i+1,lm);
     }
 
-    printf("\n===========   MAX. LANCZOS ITERATIONS REACHED\n");
+    /************************************************************************
+    ************   RESTART ITERATIONS TO IMPROVE LANCZOS SPACE   ************
+    *************************************************************************/
+
+    while (!stopLanczos(lm,diag,offdiag,&energy))
+    {
+        printf(" | Energy per particle : %.7lf",energy/Npar);
+        printf("\n------------- IMPLICIT RESTART");
+
+        // Implicit restart algorithm requires one extra Lanczos vector
+        extraB = carrNorm(nc,HC);                           // beta k+p
+        for (j = 0; j < nc; j++) HC[j] = HC[j] / extraB;    // Lvector : k+p+1
+
+        // ===================================================================
+        // Restart iterations in k = lm - lm/2
+        impRestart(nc,lm,lvec,diag,offdiag,extraB,HC);
+        for (i = lm - lm/2 - 1; i < lm - 1; i++)
+        {
+            offdiag[i] = carrNorm(nc,HC);
+
+            if (maxCheck < creal(offdiag[i])) maxCheck = creal(offdiag[i]);
+            // If method break return number of iterations achieved
+            if (creal(offdiag[i]) / maxCheck < tol)
+            {
+                free(HC);
+                free(ortho);
+                printf("\n\nWARNING : BREAKDOWN OCCURRED IN LANCZOS METHOD ");
+                printf("FOR TWO SPECIES BOSONIC MIXTURE\n\n");
+                return i;
+            }
+
+            for (j = 0; j < nc; j++) lvec[i+1][j] = HC[j] / offdiag[i];
+
+            actH(lmax,nc,ht,Ho,g,lvec[i+1],HC);
+
+            for (j = 0; j < nc; j++)
+            {
+                HC[j] = HC[j] - offdiag[i] * lvec[i][j];
+            }
+
+            diag[i + 1] = carrDot(nc,lvec[i + 1],HC);
+
+            // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
+            if ((i+1) % 10 == 0)
+            {
+                if (stopLanczos(i+1,diag,offdiag,&energy))
+                {
+                    printf(" | Energy per particle : %.7lf",energy/Npar);
+                    free(HC);
+                    free(ortho);
+                    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
+                    return i+1;
+                }
+                printf(" | Energy per particle : %.7lf",energy/Npar);
+            }
+            // -------------------------------------------------------
+
+            for (j = 0; j < nc; j++)
+            {
+                HC[j] = HC[j] - diag[i+1]*lvec[i+1][j];
+            }
+
+            // Additional re-orthogonalization procedure. The main process
+            // is parallelized because depending on the number  of Lanczos
+            // iterations it may be the most demanding time,  beating even
+            // the time to apply the Hamiltonian
+            for (j = 0; j < i + 2; j++) ortho[j] = carrDot(nc, lvec[j], HC);
+
+            #pragma omp parallel private(j,k,threadId,nthreads,hc_update)
+            {
+                threadId = omp_get_thread_num();
+                nthreads = omp_get_num_threads();
+
+                for (j = threadId; j < nc; j += nthreads)
+                {
+                    hc_update = HC[j];
+                    for (k = 0; k < i + 2; k++)
+                    {
+                        hc_update = hc_update - lvec[k][j] * ortho[k];
+                    }
+                    HC[j] = hc_update;
+                }
+            }
+            Niter++;
+            printf("\n  %3d/%d | %d",i+1,lm,Niter);
+        }
+    }
+
+    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
 
     free(ortho);
     free(HC);
@@ -608,7 +740,6 @@ int LNCZS_BBMIX(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
     Npar = MixSpace->Na + MixSpace->Nb;
     nc = MixSpace->size;
     Niter = 0;
-    //lm = 9;
 
     printf("\nLANCZOS ITERATIONS\n");
     printf(" * Progress");
@@ -664,7 +795,7 @@ int LNCZS_BBMIX(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
                 printf(" | Energy per particle : %.7lf",energy/Npar);
                 free(HC);
                 free(ortho);
-                printf("\n * ACHIEVED CONVERGENCE FOR GROUND STATE ENERGY\n");
+                printf("\n============= FINISHED LANCZOS ITERATIONS\n");
                 return i+1;
             }
             printf(" | Energy per particle : %.7lf",energy/Npar);
@@ -699,19 +830,25 @@ int LNCZS_BBMIX(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
         }
 
         Niter++;
-        printf("\n  %3d/%d | %d",i+1,lm,Niter);
+        printf("\n  %3d/%d",i+1,lm);
     }
+
+    /************************************************************************
+    ************   RESTART ITERATIONS TO IMPROVE LANCZOS SPACE   ************
+    *************************************************************************/
 
     while (!stopLanczos(lm,diag,offdiag,&energy))
     {
         printf(" | Energy per particle : %.7lf",energy/Npar);
         printf("\n------------- IMPLICIT RESTART");
-        // For implicit restart algorithm is required one extra
-        // Lanczos vector and  'beta' coefficient (offdiagonal)
-        extraB = carrNorm(nc,HC); // beta k+p
-        for (j = 0; j < nc; j++) HC[j] = HC[j] / extraB; // Lvector : k+p+1
-        impRestart(nc,lm,lvec,diag,offdiag,extraB,HC);
+
+        // Implicit restart algorithm requires one extra Lanczos vector
+        extraB = carrNorm(nc,HC);                           // beta k+p
+        for (j = 0; j < nc; j++) HC[j] = HC[j] / extraB;    // Lvector : k+p+1
+
+        // ===================================================================
         // Restart iterations in k = lm - lm/2
+        impRestart(nc,lm,lvec,diag,offdiag,extraB,HC);
         for (i = lm - lm/2 - 1; i < lm - 1; i++)
         {
             offdiag[i] = carrNorm(nc,HC);
@@ -746,7 +883,7 @@ int LNCZS_BBMIX(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
                     printf(" | Energy per particle : %.7lf",energy/Npar);
                     free(HC);
                     free(ortho);
-                    printf("\n * ACHIEVED CONVERGENCE FOR GROUND STATE ENERGY\n");
+                    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
                     return i+1;
                 }
                 printf(" | Energy per particle : %.7lf",energy/Npar);
@@ -784,7 +921,7 @@ int LNCZS_BBMIX(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
         }
     }
 
-    printf("\n=============   FINISHED LANCZOS ITERATIONS\n");
+    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
 
     free(ortho);
     free(HC);
@@ -813,13 +950,16 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
         j,
         k,
         nc,
+        Npar,
+        Niter,
         threadId,
         nthreads;
 
     double
         tol,
         maxCheck,
-        energy;
+        energy,
+        extraB;
 
     double complex
         hc_update;
@@ -827,6 +967,10 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
     Carray
         HC,
         ortho;
+
+    Niter = 0;
+    nc = MixSpace->size;
+    Npar = MixSpace->Nb + MixSpace->Nf;
 
     printf("\nLANCZOS ITERATIONS\n");
     printf(" * Progress");
@@ -836,8 +980,6 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
     // avoid numerical instability
     maxCheck = 0;
     tol = 1E-15;
-
-    nc = MixSpace->size;
 
     HC = carrDef(nc);
     ortho = carrDef(lm);
@@ -861,7 +1003,7 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
             free(HC);
             free(ortho);
             printf("\n\nWARNING : BREAKDOWN OCCURRED IN LANCZOS METHOD ");
-            printf("FOR TWO SPECIES BOSONIC MIXTURE\n\n");
+            printf("FOR TWO SPECIES BOSE-FERMI MIXTURE\n\n");
             return i;
         }
 
@@ -881,11 +1023,13 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
         {
             if (stopLanczos(i+1,diag,offdiag,&energy))
             {
+                printf(" | Energy per particle : %.7lf",energy/Npar);
                 free(HC);
                 free(ortho);
-                printf("\n * ACHIEVED CONVERGENCE FOR GROUND STATE ENERGY\n");
+                printf("\n============= FINISHED LANCZOS ITERATIONS\n");
                 return i+1;
             }
+            printf(" | Energy per particle : %.7lf",energy/Npar);
         }
         // -------------------------------------------------------
 
@@ -916,7 +1060,96 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
             }
         }
 
+        Niter++;
         printf("\n  %3d/%d",i+1,lm);
+    }
+
+    /************************************************************************
+    ************   RESTART ITERATIONS TO IMPROVE LANCZOS SPACE   ************
+    *************************************************************************/
+
+    while (!stopLanczos(lm,diag,offdiag,&energy))
+    {
+        printf(" | Energy per particle : %.7lf",energy/Npar);
+        printf("\n------------- IMPLICIT RESTART");
+
+        // Implicit restart algorithm requires one extra Lanczos vector
+        extraB = carrNorm(nc,HC);                           // beta k+p
+        for (j = 0; j < nc; j++) HC[j] = HC[j] / extraB;    // Lvector : k+p+1
+
+        // ===================================================================
+        // Restart iterations in k = lm - lm/2
+        impRestart(nc,lm,lvec,diag,offdiag,extraB,HC);
+        for (i = lm - lm/2 - 1; i < lm - 1; i++)
+        {
+            offdiag[i] = carrNorm(nc,HC);
+
+            if (maxCheck < creal(offdiag[i])) maxCheck = creal(offdiag[i]);
+            // If method break return number of iterations achieved
+            if (creal(offdiag[i]) / maxCheck < tol)
+            {
+                free(HC);
+                free(ortho);
+                printf("\n\nWARNING : BREAKDOWN OCCURRED IN LANCZOS METHOD ");
+                printf("FOR TWO SPECIES BOSE-FERMI MIXTURE\n\n");
+                return i;
+            }
+
+            for (j = 0; j < nc; j++) lvec[i+1][j] = HC[j] / offdiag[i];
+
+            bosefermi_actH(MixSpace,HoB,HoF,g,lvec[i+1],HC);
+
+            for (j = 0; j < nc; j++)
+            {
+                HC[j] = HC[j] - offdiag[i] * lvec[i][j];
+            }
+
+            diag[i + 1] = carrDot(nc,lvec[i + 1],HC);
+
+            // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
+            if ((i+1) % 10 == 0)
+            {
+                if (stopLanczos(i+1,diag,offdiag,&energy))
+                {
+                    printf(" | Energy per particle : %.7lf",energy/Npar);
+                    free(HC);
+                    free(ortho);
+                    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
+                    return i+1;
+                }
+                printf(" | Energy per particle : %.7lf",energy/Npar);
+            }
+            // -------------------------------------------------------
+
+            for (j = 0; j < nc; j++)
+            {
+                HC[j] = HC[j] - diag[i+1]*lvec[i+1][j];
+            }
+
+            // Additional re-orthogonalization procedure. The main process
+            // is parallelized because depending on the number  of Lanczos
+            // iterations it may be the most demanding time,  beating even
+            // the time to apply the Hamiltonian
+            for (j = 0; j < i + 2; j++) ortho[j] = carrDot(nc, lvec[j], HC);
+
+            #pragma omp parallel private(j,k,threadId,nthreads,hc_update)
+            {
+                threadId = omp_get_thread_num();
+                nthreads = omp_get_num_threads();
+
+                for (j = threadId; j < nc; j += nthreads)
+                {
+                    hc_update = HC[j];
+                    for (k = 0; k < i + 2; k++)
+                    {
+                        hc_update = hc_update - lvec[k][j] * ortho[k];
+                    }
+                    HC[j] = hc_update;
+                }
+            }
+            Niter++;
+            printf("\n  %3d/%d | %d",i+1,lm,Niter);
+        }
     }
 
     printf("\n===========   FINISHED LANCZOS ITERATIONS\n");
