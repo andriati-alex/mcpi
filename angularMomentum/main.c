@@ -43,6 +43,9 @@ int main(int argc, char * argv[])
         inp_fname[100],
         fname_prefix[50];
 
+    unsigned int
+        full_output;
+
     int
         i,
         Njobs,  // number of lines as input parameters to evaluate
@@ -66,6 +69,7 @@ int main(int argc, char * argv[])
     /* CONFIGURE TYPE OF SYSTEM
     ==================================================================== */
     job_file = openFileRead("job.conf");
+    full_output = 0;
     i = 1;
     while ((c = getc(job_file)) != EOF)
     {
@@ -83,6 +87,10 @@ int main(int argc, char * argv[])
                 fscanf(job_file,"%s",fname_prefix);
                 i = i + 1;
                 break;
+            case 3:
+                fscanf(job_file,"%d",&full_output);
+                i = i + 1;
+                break;
         }
         ReachNewLine(job_file);
     }
@@ -91,7 +99,7 @@ int main(int argc, char * argv[])
     =================================================================== */
 
     // Assess input parameter
-    if (i < 3)
+    if (i < 4)
     {
         printf("\n\nINPUT ERROR : not enough input lines in job.conf\n\n");
         exit(EXIT_FAILURE);
@@ -130,16 +138,16 @@ int main(int argc, char * argv[])
     switch (Nspec)
     {
         case 1:
-            SCANNING(Njobs,fname_prefix);
+            SCANNING(Njobs,fname_prefix,full_output);
             break;
         case 2:
             if (typeB == 'F' || typeB == 'f')
             {
-                BOSEFERMI_SCANNING(Njobs,fname_prefix);
+                BOSEFERMI_SCANNING(Njobs,fname_prefix,full_output);
             }
             else
             {
-                MIXTURE_SCANNING(Njobs,fname_prefix);
+                MIXTURE_SCANNING(Njobs,fname_prefix,full_output);
             }
             break;
     }

@@ -794,7 +794,7 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
 
 
 
-void SCANNING(int n_cases, char prefix [])
+void SCANNING(int n_cases, char prefix [], unsigned int full_output)
 {
     int
         i,
@@ -813,6 +813,7 @@ void SCANNING(int n_cases, char prefix [])
 
     char
         strnum[10],
+        e_fname[100],
         in_fname[100],
         out_fname[100];
 
@@ -821,11 +822,19 @@ void SCANNING(int n_cases, char prefix [])
         Ho;
 
     FILE
+        * e_file,
         * out_file;
 
     // set up name of file containing input data
     strcpy(in_fname,prefix);
     strcat(in_fname,".inp");
+
+    // set up name of file containing energy
+    strcpy(e_fname,"output/");
+    strcat(e_fname,prefix);
+    strcat(e_fname,"_energy.dat");
+    e_file = openFileWrite(e_fname);
+    fprintf(e_file,"# Energy per particle | Num. of Particles | L | g");
 
     for (i = 0; i < n_cases; i++)
     {
@@ -867,25 +876,31 @@ void SCANNING(int n_cases, char prefix [])
         E0 = GROUND_STATE(lan_it,Npar,lmax,total_mom,C,Ho,g);
         printf("\nAverage energy per particle = %.10lf",E0/Npar);
         // WRITE OUTPUT DATA IN A FILE
-        // set up output file name
-        strcpy(out_fname,"output/");
-        strcat(out_fname,prefix);
-        strcat(out_fname,"_job");
-        strcat(out_fname,strnum);
-        strcat(out_fname,".dat");
-        // open output file
-        out_file = openFileWrite(out_fname);
-        fprintf(out_file,"(%.12E+0.0j)",E0/Npar); // energy per particle
-        carrAppend(out_file,nc,C);  // ground state coefficients
+        fprintf(e_file,"\n%.10E %d %d %.10E",E0/Npar,Npar,total_mom,g);
+        if (full_output)
+        {
+            // set output file name
+            strcpy(out_fname,"output/");
+            strcat(out_fname,prefix);
+            strcat(out_fname,"_job");
+            strcat(out_fname,strnum);
+            strcat(out_fname,".dat");
+            // open output file
+            out_file = openFileWrite(out_fname);
+            fprintf(out_file,"(%.10E+0.0j)",E0/Npar); // energy per particle
+            carrAppend(out_file,nc,C);  // ground state coefficients
+            fclose(out_file);
+        }
         free(C);
         free(Ho);
-        fclose(out_file);
     }
+
+    fclose(e_file);
 }
 
 
 
-void MIXTURE_SCANNING(int n_cases, char prefix [])
+void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
 {
     int
         i,
@@ -908,6 +923,7 @@ void MIXTURE_SCANNING(int n_cases, char prefix [])
 
     char
         strnum[10],
+        e_fname[100],
         in_fname[100],
         out_fname[100];
 
@@ -917,14 +933,23 @@ void MIXTURE_SCANNING(int n_cases, char prefix [])
         HoB;
 
     FILE
+        * e_file,
         * out_file;
 
     CompoundSpace
         MixSpace;
 
-    // set up file name with input data
+    // set file name with input data
     strcpy(in_fname,prefix);
     strcat(in_fname,".inp");
+
+    // set name of file containing energy
+    strcpy(e_fname,"output/");
+    strcat(e_fname,prefix);
+    strcat(e_fname,"_energy.dat");
+    e_file = openFileWrite(e_fname);
+    fprintf(e_file,"# Energy per particle | Npar A | Npar B | L | ");
+    fprintf(e_file,"ga | gb | gab");
 
     for (i = 0; i < n_cases; i++)
     {
@@ -974,27 +999,35 @@ void MIXTURE_SCANNING(int n_cases, char prefix [])
         E0 = BOSEBOSE_GS(lan_it,MixSpace,C,HoA,HoB,g);
         printf("\nAverage energy per particle = %.10lf",E0/(NparA+NparB));
         // WRITE OUTPUT DATA IN A FILE
-        // set up file name
-        strcpy(out_fname,"output/");
-        strcat(out_fname,prefix);
-        strcat(out_fname,"_job");
-        strcat(out_fname,strnum);
-        strcat(out_fname,".dat");
-        // open output file
-        out_file = openFileWrite(out_fname);
-        fprintf(out_file,"(%.9E+0.0j)",E0/(NparA+NparB));
-        carrAppend(out_file,nc,C);
+        fprintf(e_file,"\n%.10E ",E0/(NparA+NparB));
+        fprintf(e_file,"%d %d %d ",NparA,NparB,total_mom);
+        fprintf(e_file,"%.10E %.10E %.10E",g[0],g[1],g[2]);
+        if (full_output)
+        {
+            // set output filename for coefficients
+            strcpy(out_fname,"output/");
+            strcat(out_fname,prefix);
+            strcat(out_fname,"_job");
+            strcat(out_fname,strnum);
+            strcat(out_fname,".dat");
+            // open output file
+            out_file = openFileWrite(out_fname);
+            fprintf(out_file,"(%.10E+0.0j)",E0/(NparA+NparB));
+            carrAppend(out_file,nc,C);
+            fclose(out_file);
+        }
         free(C);
         free(HoA);
         free(HoB);
-        fclose(out_file);
         freeCompSpace(MixSpace);
     }
+
+    fclose(e_file);
 }
 
 
 
-void BOSEFERMI_SCANNING(int n_cases, char prefix [])
+void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
 {
     int
         i,
@@ -1017,6 +1050,7 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [])
 
     char
         strnum[10],
+        e_fname[100],
         in_fname[100],
         out_fname[100];
 
@@ -1026,6 +1060,7 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [])
         HoF;
 
     FILE
+        * e_file,
         * out_file;
 
     BFCompoundSpace
@@ -1034,6 +1069,14 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [])
     // set up file name with input data
     strcpy(in_fname,prefix);
     strcat(in_fname,".inp");
+
+    // set name of file containing energy
+    strcpy(e_fname,"output/");
+    strcat(e_fname,prefix);
+    strcat(e_fname,"_energy.dat");
+    e_file = openFileWrite(e_fname);
+    fprintf(e_file,"# Energy per particle | N bosons | N fermions | L | ");
+    fprintf(e_file,"gb | gbf");
 
     for (i = 0; i < n_cases; i++)
     {
@@ -1082,22 +1125,30 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [])
         E0 = BOSEFERMI_GS(lan_it,MixSpace,C,HoB,HoF,g);
         printf("\nAverage energy per particle = %.10lf",E0/(NparB+NparF));
         // WRITE OUTPUT DATA IN A FILE
-        // set up file name with output data
-        strcpy(out_fname,"output/");
-        strcat(out_fname,prefix);
-        strcat(out_fname,"_job");
-        strcat(out_fname,strnum);
-        strcat(out_fname,".dat");
-        // open output file
-        out_file = openFileWrite(out_fname);
-        fprintf(out_file,"(%.12E+0.0j)",E0/(NparB+NparF));
-        carrAppend(out_file,nc,C);
+        fprintf(e_file,"\n%.10E ",E0/(NparB+NparF));
+        fprintf(e_file,"%d %d %d ",NparB,NparF,total_mom);
+        fprintf(e_file,"%.10E %.10E",g[0],g[2]);
+        if (full_output)
+        {
+            // set file name for coefficients
+            strcpy(out_fname,"output/");
+            strcat(out_fname,prefix);
+            strcat(out_fname,"_job");
+            strcat(out_fname,strnum);
+            strcat(out_fname,".dat");
+            // open output file
+            out_file = openFileWrite(out_fname);
+            fprintf(out_file,"(%.10E+0.0j)",E0/(NparB+NparF));
+            carrAppend(out_file,nc,C);
+            fclose(out_file);
+        }
         free(C);
         free(HoB);
         free(HoF);
-        fclose(out_file);
         freeBoseFermiSpace(MixSpace);
     }
+
+    fclose(e_file);
 }
 
 
