@@ -5,10 +5,10 @@
 
 
 
-/** FUNCTIONS TO BE CALLED IN THE EXECUTABLE PROGRAMS
-    =================================================
+/** FUNCTIONS CALLED IN THE EXECUTABLE PROGRAMS
+    ===========================================
     These functions provide an interface to read parameters
-    and call Lanczos algorithm and record output data.  **/
+    call Lanczos algorithm and record output data.      **/
 
 
 
@@ -39,7 +39,7 @@ void parLine(char fname [], int line, int * N, int * lmax, int * L, double * g)
 
 
 
-void MixParLine(char fname [], int line, int * NA, int * lmaxA,
+void mixParLine(char fname [], int line, int * NA, int * lmaxA,
                 int * NB, int * lmaxB, int * L, double g [])
 {
 
@@ -75,15 +75,10 @@ double IMAGTIME(int Nsteps, double dt, int Npar, int lmax, int total_mom,
                 Carray C, Carray Ho, double g)
 {
 
-/** Find the lowest Eigenvalue using Lanczos tridiagonal decomposition
-    for the hamiltonian in configurational space, with orbitals fixed.
-    Use up to Niter(unless the a breakdown occur) in Lanczos method to
-    obtain a basis-fixed ground state approximation  of  the truncated
-    configuration space.
-
-    INPUT/OUTPUT : C (end up as eigenvector approximation)
-
-    RETURN : Lowest eigenvalue found **/
+/** SHORT ITERATIVE LANCZOS(SIL) INTEGRATOR IN IMAGINARY TIME
+    =========================================================
+    INPUT/OUTPUT : C - coefficients at time  t = dt*Nsteps
+    RETURN : Energy of the state at time t = dt*Nsteps **/
 
     int
         i,
@@ -439,8 +434,8 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
     Use up to Niter unless achieve convergence criterion or the method
     breakdown. The first case is preferable.
 
-    INPUT/OUTPUT : C input initial guess \ output GS in config. basis.
-    RETURN : Lowest eigenvalue found                               **/
+    INPUT/OUTPUT : C input guess / output ground state coefficients
+    RETURN : Lowest eigenvalue found                            **/
 
     int
         i,
@@ -481,13 +476,13 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
     if (nc == 0)
     {
         printf("\n\nDIAGONALIZATION PROCESS ABORTED : The parameters ");
-        printf("requested, Npar = %d, lmax = %d, L = %d ",Npar,lmax,total_mom);
-        printf("generated empty config. space.\n\n");
+        printf("requested, Npar = %d, lmax = %d, L = %d",Npar,lmax,total_mom);
+        printf(" generated empty config. space.\n\n");
         exit(EXIT_FAILURE);
     }
 
     ht = BAssembleHT(Npar,lmax,total_mom,nc);
-    H = assembleH(Npar,lmax,nc,ht,Ho,g);
+    H = boseH(Npar,lmax,nc,ht,Ho,g);
     if (H == NULL) printf("   Without set up (sparse) Hamiltonian matrix\n");
     else           printf("   Using (sparse) Hamiltonian matrix\n");
 
@@ -522,7 +517,7 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
     // Lanczos Vectors (organized by rows of the following matrix)
     lvec = cmatDef(Niter,nc);
     // initiate date to call lanczos. The first vector is the input guess
-    for (i = 0; i < nc; i++)  lvec[0][i] = C[i];
+    for (i = 0; i < nc; i++) lvec[0][i] = C[i];
 
     /***   CALL LANCZOS ITERATIONS   ***/
     predictedIter = Niter;
@@ -576,7 +571,7 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
 {
 
 /** COMPUTE GROUND STATE OF TWO SPECIES BOSONIC MIXTURE USING LANCZOS 
-    INPUT/OUTPUT : C input guess / output ground state in config. basis
+    INPUT/OUTPUT : C input guess / output ground state coefficients
     RETURN : Lowest eigenvalue found **/
 
     int
@@ -584,11 +579,9 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
         k,
         j,
         nc,
-        Nsteps,
         predictedIter;
 
     double
-        dt,
         GSenergy;
 
     Rarray
@@ -603,10 +596,13 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
     Cmatrix
         lvec;
 
+    HConfMat
+        H;
+
     printf("\n * EVALUATING GROUND STATE OF TWO SPECIES BOSONIC MIXTURE\n");
 
     nc = MixSpace->size;
-    if (MixSpace->size == 1)
+    if (nc == 1)
     {
         // In this case there must be only one config. because there
         // is only one single particle state for each species
@@ -618,29 +614,48 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
         return GSenergy;
     }
 
-    // In the case the system is too large that the memory required
-    // exceeded the tolerance, apply implicit restarts
+    // TRY TO ALLOCATE MATRIX. IF THE MEMORY REQUIRED EXCEED
+    // THE TOLERANCE DEFINED RETURN NULL POINTER
+    H = boseboseH(MixSpace,HoA,HoB,g);
+    if (H == NULL) printf("   Without set (sparse) Hamiltonian matrix\n");
+    else           printf("   Using (sparse) Hamiltonian matrix\n");
+
+    // USE RESTARTS IF THE MEMORY FOR LANCZOS VECTORS WILL
+    // EXCEED THE TOLERANCE DEFINED BEFORE COMPLETING  THE
+    // DEFAULT NUMBER OF LANCZOS ITERATIONS 'MAX_LNCZS_IT'
     if (nc > MAX_LNCZS_IT && Niter < MAX_LNCZS_IT) Niter = 20;
 
-    // variables to call LAPACK routine. eigvec matrix is stored in
-    // a vector in row major order
-    d = rarrDef(Niter);
-    e = rarrDef(Niter);
-    eigvec = rarrDef(Niter * Niter);
-    // output of lanczos iterative method - Tridiagonal decomposition
-    diag = carrDef(Niter);
-    offdiag = carrDef(Niter);
+    // VARIABLES TO CALL LAPACK DIAGONALIZATION OF TRIDIAGONAL MATRIX
+    d = rarrDef(Niter);             // diagonal elements
+    e = rarrDef(Niter);             // off-diagonal elements
+    eigvec = rarrDef(Niter*Niter);  // eigenvectors in row-major-order
+
+    // OUTPUT OF LANCZOS ITERATIVE METHOD - TRIDIAGONAL DECOMPOSITION
+    diag = carrDef(Niter);      // diagonal elements
+    offdiag = carrDef(Niter);   // off-diagonal elements
     offdiag[Niter-1] = 0;
-    // Lanczos Vectors (organized by rows of the following matrix)
+
+    // LANCZOS VECTORS (ORGANIZED BY ROWS OF THE FOLLOWING MATRIX)
     lvec = cmatDef(Niter,nc);
-    // initiate date to call lanczos. The first vector is the input guess
+
+    // INITIATE DATE TO CALL LANCZOS. THE FIRST VECTOR IS THE INPUT GUESS
     for (i = 0; i < nc; i++) lvec[0][i] = C[i];
 
-    /***   CALL LANCZOS   ***/
-    predictedIter = Niter;
-    Niter = LNCZS_BBMIX(Niter,MixSpace,HoA,HoB,g,diag,offdiag,lvec);
+    /************************
+     ***   CALL LANCZOS   ***
+     ************************/
 
-    // Transfer data to use lapack routine
+    predictedIter = Niter;
+    if (H == NULL)
+    {
+        Niter = LNCZS_BBMIX(Niter,MixSpace,HoA,HoB,g,diag,offdiag,lvec);
+    }
+    else
+    {
+        Niter = LNCZS_HMAT(Niter,nc,H,diag,offdiag,lvec);
+    }
+
+    // TRANSFER DATA TO USE LAPACK ROUTINE
     for (k = 0; k < Niter; k++)
     {
         d[k] = creal(diag[k]);    // Supposed to be real
@@ -648,13 +663,17 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
         for (j = 0; j < Niter; j++) eigvec[k * Niter + j] = 0;
     }
 
-    /***   CALL LAPACK FOR TRIDIAGONAL LANCZOS OUTPUT   ***/
+    /******************************************************
+     ***   CALL LAPACK FOR TRIDIAGONAL LANCZOS OUTPUT   ***
+     ******************************************************/
+
     k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
     if (k != 0)  LAPACK_PROBLEM(k,"BOSEBOSE_GS");
 
     GSenergy = d[0];
+
+    // UPDATE C WITH THE COEFFICIENTS OF GROUND STATE
     j = 0;
-    // Update C with the coefficients of ground state
     for (i = 0; i < nc; i++)
     {
         C[i] = 0;
@@ -672,18 +691,7 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
     // free matrices
     for (i = 0; i < predictedIter; i++) free(lvec[i]);
     free(lvec);
-
-    // Check if the Lanczos iterations spontaneously stopped due
-    // to the variations in ground state energy below tolerance.
-    // if not the system is possibly not in the ground state yet
-    // thus call imaginary time evolution
-    /*
-    if (nc > MAX_LNCZS_IT && Niter == predictedIter)
-    {
-        dt = 0.1 * (1.0 / GSenergy);
-        Nsteps = 1000;
-        GSenergy = MIXTURE_IMAGTIME(Nsteps,dt,MixSpace,C,HoA,HoB,g);
-    }*/
+    if (H != NULL) freeHmat(H);
 
     return GSenergy;
 }
@@ -695,8 +703,8 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
 {
 
 /** COMPUTE GROUND STATE OF BOSE-FERMI MIXTURE USING LANCZOS
-    INPUT/OUTPUT : C input guess / output ground state in config. basis
-    RETURN : Lowest eigenvalue found **/
+    INPUT/OUTPUT : C input guess / output ground state coefficients
+    RETURN : Lowest eigenvalue found                            **/
 
     int
         i,
@@ -720,7 +728,10 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
     Cmatrix
         lvec;
 
-    printf("\n * EVALUATING GROUND STATE OF TWO SPECIES BOSONIC MIXTURE\n");
+    HConfMat
+        H;
+
+    printf("\n * EVALUATING GROUND STATE OF BOSE-FERMI MIXTURE\n");
 
     nc = MixSpace->size;
     if (MixSpace->size == 1)
@@ -734,6 +745,12 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
         free(diag);
         return GSenergy;
     }
+
+    // TRY TO ALLOCATE MATRIX. IF THE MEMORY REQUIRED EXCEED
+    // THE TOLERANCE DEFINED RETURN NULL POINTER
+    H = bosefermiH(MixSpace,HoB,HoF,g);
+    if (H == NULL) printf("   Without set (sparse) Hamiltonian matrix\n");
+    else           printf("   Using (sparse) Hamiltonian matrix\n");
 
     // In the case the system is too large that the memory required
     // exceeded the tolerance, apply implicit restarts
@@ -755,7 +772,16 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
 
     /***   CALL LANCZOS   ***/
     predictedIter = Niter;
-    Niter = LNCZS_BFMIX(Niter,MixSpace,HoB,HoF,g,diag,offdiag,lvec);
+    // Niter = LNCZS_BFMIX(Niter,MixSpace,HoB,HoF,g,diag,offdiag,lvec);
+    // Niter = LNCZS_HMAT(Niter,nc,H,diag,offdiag,lvec);
+    if (H == NULL)
+    {
+        Niter = LNCZS_BFMIX(Niter,MixSpace,HoB,HoF,g,diag,offdiag,lvec);
+    }
+    else
+    {
+        Niter = LNCZS_HMAT(Niter,nc,H,diag,offdiag,lvec);
+    }
     // Transfer data to use lapack routine
     for (k = 0; k < Niter; k++)
     {
@@ -788,6 +814,7 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
     // free matrices
     for (i = 0; i < predictedIter; i++) free(lvec[i]);
     free(lvec);
+    if (H != NULL) freeHmat(H);
 
     return GSenergy;
 }
@@ -956,7 +983,7 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         // number of line as string to append in output file name
         sprintf(strnum,"%d",i+1);
         // set up parameters of config. space from line 'i' of input file
-        MixParLine(in_fname,i,&NparA,&lmaxA,&NparB,&lmaxB,&total_mom,g);
+        mixParLine(in_fname,i,&NparA,&lmaxA,&NparB,&lmaxB,&total_mom,g);
         MixSpace = AllocCompBasis(NparA,NparB,lmaxA,lmaxB,total_mom);
         nc = MixSpace->size;
         printf("\n\n\nCOMPUTING GROUND STATE(MIXTURE) %d/%d\n",i+1,n_cases);
@@ -1083,7 +1110,7 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         // number of line as string to append in output file name
         sprintf(strnum,"%d",i+1);
         // set up parameters of config. space from line 'i' of input file
-        MixParLine(in_fname,i,&NparB,&lmaxB,&NparF,&lmaxF,&total_mom,g);
+        mixParLine(in_fname,i,&NparB,&lmaxB,&NparF,&lmaxF,&total_mom,g);
         MixSpace = BoseFermiBasis(NparB,NparF,lmaxB,lmaxF,total_mom);
         nc = MixSpace->size;
         printf("\n\n\nCOMPUTING GROUND STATE(BOSE-FERMI) %d/%d\n",i+1,n_cases);

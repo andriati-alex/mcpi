@@ -230,6 +230,8 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
         {
             // With 32-bit integers is impossible to enumerate
             // vector in sparse Hamiltonian matrix
+            free(v);
+            free(z);
             return -2;
         }
         // Add the number of non-zero entries in this row
@@ -241,6 +243,8 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
         {
             // According to the pre-defined memory tolerance
             // the program will not store the Hamiltonian matrix
+            free(v);
+            free(z);
             return -1;
         }
     }
@@ -252,7 +256,525 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
 
 
 
-HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g)
+int NNZ_PerRow_BBMIX(CompoundSpace S, Iarray NNZrow)
+{
+
+/** COMPUTE NUMBER OF NONZERO ENTRIES IN THE HAMILTONIAN USING THE
+    MULTICONFIGURATIONAL BASIS FOR 2 SPECIES OF BOSONS
+    =================================================================
+    To compute the Number of NonZero(NNZ) entries this routine  scans
+    all the rules from creation and annihilation op. In this case the
+    ones that conserve the total angular momentum.                **/
+
+    int
+        i,
+        j,
+        k,
+        l,
+        s,
+        q,
+        n,
+        ia,
+        ib,
+        Nla,
+        Nlb,
+        low,
+        up,
+        nnze,
+        next_i,
+        mcsize;
+
+    Iarray
+        z,
+        vA,
+        vB;
+
+    unsigned long
+        MemReq;
+
+    Nla = 2 * S->lmaxA + 1; // total number of Individual Particle States A
+    Nlb = 2 * S->lmaxB + 1; // total number of Individual Particle States B
+    mcsize = S->size;       // dimension of the multiconfig space
+
+    vA = iarrDef(Nla);      // vector of occupation numbers species A
+    vB = iarrDef(Nlb);      // vector of occupation numbers species B
+
+    nnze = 0;               // total Number of NonZero Elements
+
+    // 'z' stack up all column indexes that contains a non-zero
+    // entry in the Hamiltonian matrix.  Of  curse  the maximum
+    // size of 'z' is the dimension of the  space  'mcsize'  in
+    // worst case.
+    z = iarrDef(mcsize);
+
+    for (i = 0; i < mcsize; i++)
+    {
+        // copy current configuration occupations
+        BBgetConfigs(i,S,vA,vB);
+
+        // Intraspecies interactions neither change the subspace
+        // nor influence the individual hashing index.
+        n = BBsubIndex(S,vA);
+        ia = BgetIndex(S->lmaxA,S->sub[n].sizeA,S->sub[n].hta,vA);
+        ib = BgetIndex(S->lmaxB,S->sub[n].sizeB,S->sub[n].htb,vB);
+
+        // initialize with the diagonal index  (aways  present)
+        // from the rules that remove and replace the particles
+        // in the same states,  thus providing the same config.
+        z[0] = i;
+        next_i = 1;
+
+        /*************************************************************
+         **                                                         **
+         **                                                         **
+         **               INTERACTION AMONG A-SPECIES               **
+         **                (only off-diagonal rules)                **
+         **                                                         **
+         **                                                         **
+         *************************************************************/
+
+        // Rule : Creation on k k / Annihilation on q l
+        // ONLY IN CASE q + l = 2 * k
+        for (k = 0; k < Nla; k++)
+        {
+            if (vA[k] < 2) continue;
+            for (q = 0; q < Nla; q++)
+            {
+                l = 2 * k - q;
+                if (q == k || l < 0 || l > q) continue;
+
+                vA[k] -= 2;
+                vA[l] += 1;
+                vA[q] += 1;
+                // j = BgetIndex(lmax,mcsize,ht,v);
+                j = BBgetIndex_A(S,n,ib,vA);
+                InsertNZ_ind(&next_i,j,z);
+                vA[k] += 2;
+                vA[l] -= 1;
+                vA[q] -= 1;
+            }
+        }
+
+        // Rule : Creation on k s / Annihilation on q q
+        // ONLY IN CASE k + s = 2 * q
+        for (q = 0; q < Nla; q++)
+        {
+            for (k = 0; k < Nla; k++)
+            {
+                s = 2 * q - k;
+                if (q == k || s < 0 || s > k) continue;
+                if (vA[k] < 1 || vA[s] < 1) continue;
+
+                vA[k] -= 1;
+                vA[s] -= 1;
+                vA[q] += 2;
+                // j = BgetIndex(lmax,mcsize,ht,v);
+                j = BBgetIndex_A(S,n,ib,vA);
+                InsertNZ_ind(&next_i,j,z);
+                vA[k] += 1;
+                vA[s] += 1;
+                vA[q] -= 2;
+            }
+        }
+
+        // Rule : Creation on k s / Annihilation on q l
+        // ONLY IN CASE k + s = q + l
+        for (k = 0; k < Nla; k++)
+        {
+            if (vA[k] < 1) continue;
+            for (s = k + 1; s < Nla; s++)
+            {
+                if (vA[s] < 1) continue;
+                for (q = 0; q < Nla; q++)
+                {
+                    l = k + s - q;
+                    if (q == s || q == k) continue;
+                    if (l < 0  || l > q ) continue;
+
+                    vA[k] -= 1;
+                    vA[s] -= 1;
+                    vA[q] += 1;
+                    vA[l] += 1;
+                    // j = BgetIndex(lmax,mcsize,ht,v);
+                    j = BBgetIndex_A(S,n,ib,vA);
+                    InsertNZ_ind(&next_i,j,z);
+                    vA[k] += 1;
+                    vA[s] += 1;
+                    vA[q] -= 1;
+                    vA[l] -= 1;
+                }       // Finish q
+            }           // Finish s
+        }               // Finish k
+
+        /*************************************************************
+         **                                                         **
+         **                                                         **
+         **               INTERACTION AMONG B-SPECIES               **
+         **                (only off-diagonal rules)                **
+         **                                                         **
+         **                                                         **
+         *************************************************************/
+
+        // Rule : Creation on k k / Annihilation on q l
+        // ONLY IN CASE q + l = 2 * k
+        for (k = 0; k < Nlb; k++)
+        {
+            if (vB[k] < 2) continue;
+            for (q = 0; q < Nlb; q++)
+            {
+                l = 2 * k - q;
+                if (q == k || l < 0 || l > q) continue;
+
+                vB[k] -= 2;
+                vB[l] += 1;
+                vB[q] += 1;
+                // j = BgetIndex(lmax,mcsize,ht,v);
+                j = BBgetIndex_B(S,n,ia,vB);
+                InsertNZ_ind(&next_i,j,z);
+                vB[k] += 2;
+                vB[l] -= 1;
+                vB[q] -= 1;
+            }
+        }
+
+        // Rule : Creation on k s / Annihilation on q q
+        // ONLY IN CASE k + s = 2 * q
+        for (q = 0; q < Nlb; q++)
+        {
+            for (k = 0; k < Nlb; k++)
+            {
+                s = 2 * q - k;
+                if (q == k || s < 0 || s > k) continue;
+                if (vB[k] < 1 || vB[s] < 1) continue;
+
+                vB[k] -= 1;
+                vB[s] -= 1;
+                vB[q] += 2;
+                // j = BgetIndex(lmax,mcsize,ht,v);
+                j = BBgetIndex_B(S,n,ia,vB);
+                InsertNZ_ind(&next_i,j,z);
+                vB[k] += 1;
+                vB[s] += 1;
+                vB[q] -= 2;
+            }
+        }
+
+        // Rule : Creation on k s / Annihilation on q l
+        // ONLY IN CASE k + s = q + l
+        for (k = 0; k < Nlb; k++)
+        {
+            if (vB[k] < 1) continue;
+            for (s = k + 1; s < Nlb; s++)
+            {
+                if (vB[s] < 1) continue;
+                for (q = 0; q < Nlb; q++)
+                {
+                    l = k + s - q;
+                    if (q == s || q == k) continue;
+                    if (l < 0  || l > q ) continue;
+
+                    vB[k] -= 1;
+                    vB[s] -= 1;
+                    vB[q] += 1;
+                    vB[l] += 1;
+                    // j = BgetIndex(lmax,mcsize,ht,v);
+                    j = BBgetIndex_B(S,n,ia,vB);
+                    InsertNZ_ind(&next_i,j,z);
+                    vB[k] += 1;
+                    vB[s] += 1;
+                    vB[q] -= 1;
+                    vB[l] -= 1;
+                }       // Finish q
+            }           // Finish s
+        }               // Finish k
+
+        /************************************************************
+         **                                                        **
+         **                                                        **
+         **                INTERSPECIES INTERACTION                **
+         **                                                        **
+         **                                                        **
+         ************************************************************/
+        // PHYSICAL INTERACTION
+        for (k = 0; k < Nla; k++)
+        {
+            for (s = 0; s < Nlb; s++)
+            {
+                // NO MOMENTUM EXCHANGED CONTRIBUTES ONLY IN DIAGONAL
+
+                // MOMENTUM EXCHANGED BY q UNITS
+                if (s + k < Nlb) low = -k;
+                else             low = -(Nlb - 1 - s);
+                if (k + s < Nla) up  = s;
+                else             up = Nla-1-k;
+                for(q = low; q <= up; q++)
+                {
+                    if (q == 0) continue; // no momentum exchanged
+                    if (vA[k+q]*vB[s-q] == 0) continue;
+                    vA[k+q] -= 1;
+                    vA[k]   += 1;
+                    vB[s-q] -= 1;
+                    vB[s]   += 1;
+                    j = BBgetIndex(S,vA,vB);
+                    InsertNZ_ind(&next_i,j,z);
+                    vA[k+q] += 1;
+                    vA[k]   -= 1;
+                    vB[s-q] += 1;
+                    vB[s]   -= 1;
+                }
+            }
+        }
+
+        if (nnze >= INT_MAX - next_i)
+        {
+            // With 32-bit integers is impossible to enumerate
+            // vector in sparse Hamiltonian matrix
+            free(vA);
+            free(vB);
+            free(z);
+            return -2;
+        }
+        // Add the number of non-zero entries in this row
+        nnze = nnze + next_i;
+        NNZrow[i] = next_i;
+
+        MemReq = nnze*(sizeof(int)+sizeof(double complex))+mcsize*sizeof(int);
+        if (MemReq > MEMORY_TOL)
+        {
+            // According to the pre-defined memory tolerance
+            // the program will not store the Hamiltonian matrix
+            free(vA);
+            free(vB);
+            free(z);
+            return -1;
+        }
+    }
+
+    free(vA);
+    free(vB);
+    free(z);
+    return nnze;
+}
+
+
+
+int NNZ_PerRow_BFMIX(BFCompoundSpace S, Iarray NNZrow)
+{
+
+/** COMPUTE NUMBER OF NONZERO ENTRIES IN THE HAMILTONIAN USING  THE
+    MULTICONFIGURATIONAL BASIS FOR 2 SPECIES OF FERMIONS AND BOSONS
+    =================================================================
+    To compute the Number of NonZero(NNZ) entries this routine  scans
+    all the rules from creation and annihilation op. In this case the
+    ones that conserve the total angular momentum.                **/
+
+    int
+        i,
+        j,
+        k,
+        l,
+        s,
+        q,
+        n,
+        iF,
+        Nlf,
+        Nlb,
+        low,
+        up,
+        nnze,
+        next_i,
+        mcsize;
+    Iarray
+        z,
+        vB;
+    Farray
+        vF;
+    unsigned long
+        MemReq;
+
+    Nlb = 2 * S->lmaxB + 1; // total number of Individual Particle States A
+    Nlf = 2 * S->lmaxF + 1; // total number of Individual Particle States B
+    mcsize = S->size;       // dimension of the multiconfig space
+
+    vF = farrDef(Nlf);      // vector of occupation numbers Fermions
+    vB = iarrDef(Nlb);      // vector of occupation numbers Bosons
+
+    nnze = 0;               // total Number of NonZero Elements
+
+    // 'z' stack up all column indexes that contains a non-zero
+    // entry in the Hamiltonian matrix.  Of  curse  the maximum
+    // size of 'z' is the dimension of the  space  'mcsize'  in
+    // worst case.
+    z = iarrDef(mcsize);
+
+    for (i = 0; i < mcsize; i++)
+    {
+        // copy current configuration occupations
+        BFgetConfigs(i,S,vB,vF);
+
+        // Intraspecies interactions neither change the subspace
+        // nor influence the individual hashing index.
+        n = BFsubIndex(S,vB);
+        iF = FgetIndex(S->lmaxF,S->sub[n].sizeF,S->sub[n].htf,vF);
+
+        // initialize with the diagonal index  (aways  present)
+        // from the rules that remove and replace the particles
+        // in the same states,  thus providing the same config.
+        z[0] = i;
+        next_i = 1;
+
+        /*************************************************************
+         **                                                         **
+         **                                                         **
+         **               INTERACTION  AMONG BOSONS                 **
+         **               (only off-diagonal rules)                 **
+         **                                                         **
+         **                                                         **
+         *************************************************************/
+
+        // Rule : Creation on k k / Annihilation on q l
+        // ONLY IN CASE q + l = 2 * k
+        for (k = 0; k < Nlb; k++)
+        {
+            if (vB[k] < 2) continue;
+            for (q = 0; q < Nlb; q++)
+            {
+                l = 2 * k - q;
+                if (q == k || l < 0 || l > q) continue;
+
+                vB[k] -= 2;
+                vB[l] += 1;
+                vB[q] += 1;
+                // j = BgetIndex(lmax,mcsize,ht,v);
+                j = BFgetIndex_B(S,n,iF,vB);
+                InsertNZ_ind(&next_i,j,z);
+                vB[k] += 2;
+                vB[l] -= 1;
+                vB[q] -= 1;
+            }
+        }
+
+        // Rule : Creation on k s / Annihilation on q q
+        // ONLY IN CASE k + s = 2 * q
+        for (q = 0; q < Nlb; q++)
+        {
+            for (k = 0; k < Nlb; k++)
+            {
+                s = 2 * q - k;
+                if (q == k || s < 0 || s > k) continue;
+                if (vB[k] < 1 || vB[s] < 1) continue;
+
+                vB[k] -= 1;
+                vB[s] -= 1;
+                vB[q] += 2;
+                // j = BgetIndex(lmax,mcsize,ht,v);
+                j = BFgetIndex_B(S,n,iF,vB);
+                InsertNZ_ind(&next_i,j,z);
+                vB[k] += 1;
+                vB[s] += 1;
+                vB[q] -= 2;
+            }
+        }
+
+        // Rule : Creation on k s / Annihilation on q l
+        // ONLY IN CASE k + s = q + l
+        for (k = 0; k < Nlb; k++)
+        {
+            if (vB[k] < 1) continue;
+            for (s = k + 1; s < Nlb; s++)
+            {
+                if (vB[s] < 1) continue;
+                for (q = 0; q < Nlb; q++)
+                {
+                    l = k + s - q;
+                    if (q == s || q == k) continue;
+                    if (l < 0  || l > q ) continue;
+
+                    vB[k] -= 1;
+                    vB[s] -= 1;
+                    vB[q] += 1;
+                    vB[l] += 1;
+                    // j = BgetIndex(lmax,mcsize,ht,v);
+                    j = BFgetIndex_B(S,n,iF,vB);
+                    InsertNZ_ind(&next_i,j,z);
+                    vB[k] += 1;
+                    vB[s] += 1;
+                    vB[q] -= 1;
+                    vB[l] -= 1;
+                }       // Finish q
+            }           // Finish s
+        }               // Finish k
+
+        /************************************************************
+         **                                                        **
+         **                                                        **
+         **                INTERSPECIES INTERACTION                **
+         **                                                        **
+         **                                                        **
+         ************************************************************/
+        for (s = 0; s < Nlf; s++)
+        {
+            for (k = 0; k < Nlb; k++)
+            {
+                // NO MOMENTUM EXCHANGED CONTRIBUTES ONLY IN DIAGONAL
+
+                // MOMENTUM EXCHANGED BY q UNITS
+                if (s + k < Nlf) low = -k;
+                else             low = -(Nlf - 1 - s);
+                if (k + s < Nlb) up  = s;
+                else             up = Nlb-1-k;
+                for(q = low; q <= up; q++)
+                {
+                    if (q == 0) continue; // no momentum exchanged
+                    if (vB[k+q]*vF[s-q] == 0 || vF[s] > 0) continue;
+                    vB[k+q] -= 1;
+                    vB[k]   += 1;
+                    vF[s-q]  = 0;
+                    vF[s]    = 1;
+                    j = BFgetIndex(S,vB,vF);
+                    InsertNZ_ind(&next_i,j,z);
+                    vB[k+q] += 1;
+                    vB[k]   -= 1;
+                    vF[s-q]  = 1;
+                    vF[s]    = 0;
+                }
+            }
+        }
+
+        if (nnze >= INT_MAX - next_i)
+        {
+            // With 32-bit integers is impossible to enumerate
+            // vector in sparse Hamiltonian matrix
+            free(vF);
+            free(vB);
+            free(z);
+            return -2;
+        }
+        // Add the number of non-zero entries in this row
+        nnze = nnze + next_i;
+        NNZrow[i] = next_i;
+
+        MemReq = nnze*(sizeof(int)+sizeof(double complex))+mcsize*sizeof(int);
+        if (MemReq > MEMORY_TOL)
+        {
+            // According to the pre-defined memory tolerance
+            // the program will not store the Hamiltonian matrix
+            free(vF);
+            free(vB);
+            free(z);
+            return -1;
+        }
+    }
+
+    free(vF);
+    free(vB);
+    free(z);
+    return nnze;
+}
+
+
+
+HConfMat boseH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g)
 {
 
 /** SET UP THE HAMILTONIAN MATRIX (SPARSE) FOR SINGLE BOSONIC SPECIES
@@ -525,6 +1047,906 @@ HConfMat assembleH(int N, int lmax, int mcsize, Iarray * ht, Carray Ho, double g
 
     free(v);
     free(NNZrow);
+    return M;
+}
+
+
+
+HConfMat boseboseH(CompoundSpace S, Carray HoA, Carray HoB, double g [])
+{
+
+/** ASSEMBLE (SPARSE) HAMILTONIAN MATRIX OF 2-SPECIES BOSONIC MIXTURE
+    =================================================================
+    First compute the number of non-zero elements. If the memory
+    required is less than the memory allowed by HMAT_MEM_TOL  it
+    return a structure with the sparse matrix                **/
+
+    int
+        i,
+        j,
+        k,
+        l,
+        s,
+        q,
+        n,
+        p,
+        t,
+        ia,
+        ib,
+        up,
+        low,
+        Nla,
+        Nlb,
+        nnze;
+    double
+        ga,
+        gb,
+        gab,
+        bosef;
+    double complex
+        w,
+        za,
+        zb,
+        zab;
+    Iarray
+        vB,
+        vA,
+        NNZrow;
+    HConfMat
+        M;
+
+    Nla = 2 * S->lmaxA + 1; // total number of Individual Particle States A
+    Nlb = 2 * S->lmaxB + 1; // total number of Individual Particle States B
+
+    ga = g[0];
+    gb = g[1];
+    gab = g[2];
+
+    vA = iarrDef(Nla);  // vector of occupation numbers A
+    vB = iarrDef(Nlb);  // vector of occupation numbers B
+
+    // Compute number of  nonzero  entries to allocate sparse
+    // matrix structure including the nonzero entries per row
+    NNZrow = iarrDef(S->size);
+    nnze = NNZ_PerRow_BBMIX(S,NNZrow);
+
+    if (nnze < 0)
+    {
+        // Two problems may have occurred in computing number of nonzero
+        // elements of Hamiltonian matrix : 1. 'nnze' exceeded INT_MAX
+        // 2. Memory required exceeded the tolerance
+        free(vA);
+        free(vB);
+        free(NNZrow);
+        return NULL;
+    }
+
+    M = allocEmptyMat(S->size,nnze);
+
+    // initialize with arbitrary values
+    for (i = 0; i < nnze; i++)
+    {
+        M->vals[i] = 0;
+        M->cols[i] = -1;
+    }
+
+    // Configure the strides to find in the sparse storage
+    // vectors of values and columns where each row begins
+    M->rows[0] = 0;
+    for (i = 0; i < S->size; i++) M->rows[i+1] = M->rows[i] + NNZrow[i];
+
+    // 't' variable tracks what was the last 'index' used
+    // in vector of values and columns in sparse matrix
+    t = 0;
+
+    for (i = 0; i < S->size; i++)
+    {
+        w = 0;
+        za = 0;
+        zb = 0;
+        zab = 0;
+
+        // copy current configuration occupations
+        BBgetConfigs(i,S,vA,vB);
+
+        // Intraspecies interactions neither change the subspace
+        // nor influence the individual hashing index.
+        n = BBsubIndex(S,vA);
+        ia = BgetIndex(S->lmaxA,S->sub[n].sizeA,S->sub[n].hta,vA);
+        ib = BgetIndex(S->lmaxB,S->sub[n].sizeB,S->sub[n].htb,vB);
+
+        // KINECT ENERGY - creation and annihilation at k
+        for (k = 0; k < Nla; k++) w = w + HoA[k]*vA[k];
+        for (k = 0; k < Nlb; k++) w = w + HoB[k]*vB[k];
+
+        // Rule : Creation on k k / Annihilation on k k
+        for (k = 0; k < Nla; k++)
+        {
+            bosef = vA[k] * (vA[k] - 1);
+            za = za + ga * bosef;
+        }
+        // Rule : Creation on k s / Annihilation on k s
+        for (k = 0; k < Nla; k++)
+        {
+            if (vA[k] < 1) continue;
+            for (s = k + 1; s < Nla; s++)
+            {
+                bosef = vA[k] * vA[s];
+                za = za + 4 * ga * bosef;
+            }
+        }
+        // Rule : Creation on k k / Annihilation on k k
+        for (k = 0; k < Nlb; k++)
+        {
+            bosef = vB[k] * (vB[k] - 1);
+            zb = zb + gb * bosef;
+        }
+        // Rule : Creation on k s / Annihilation on k s
+        for (k = 0; k < Nlb; k++)
+        {
+            if (vB[k] < 1) continue;
+            for (s = k + 1; s < Nlb; s++)
+            {
+                bosef = vB[k] * vB[s];
+                zb = zb + 4 * gb * bosef;
+            }
+        }
+        for (k = 0; k < Nla; k++)
+        {
+            for (s = 0; s < Nlb; s++)
+            {
+                // NO MOMENTUM EXCHANGED
+                bosef = vA[k]*vB[s];
+                zab = zab + gab * bosef;
+            }
+        }
+
+        M->cols[t] = i;
+        M->vals[t] = w + za/2 + zb/2 + zab;
+        t = t + 1;
+
+
+
+        /*************************************************************
+         **                                                         **
+         **                                                         **
+         **               INTERACTION AMONG A-SPECIES               **
+         **                (off-diagonal terms only)                **
+         **                                                         **
+         **                                                         **
+         *************************************************************/
+
+        // Rule : Creation on k k / Annihilation on q l
+        // ONLY IN CASE q + l = 2 * k
+        for (k = 0; k < Nla; k++)
+        {
+            if (vA[k] < 2) continue;
+            for (q = 0; q < Nla; q++)
+            {
+                l = 2 * k - q;
+                // Avoid repeating/forbidden rules
+                if (q == k || l < 0 || l >= q) continue;
+
+                // compute bosonic factor from op. action
+                bosef = sqrt((double)vA[k]*(vA[k]-1)*(vA[q]+1)*(vA[l]+1));
+                // assemble the configuration according to action of op.
+                vA[k] -= 2;
+                vA[l] += 1;
+                vA[q] += 1;
+                // Compute col index in 'j'
+                j = BBgetIndex_A(S,n,ib,vA);
+                // value to be set in the matrix at col 'j'
+                // factor 2 counts for the symmetry q-l
+                // justifying the choice for only l > q
+                za = 2 * ga * bosef;
+                // Check in the current row if the col 'j' has
+                // already appeared. Then add its contribution
+                for (p = M->rows[i]; p < t; p++)
+                {
+                    if (j == M->cols[p])
+                    {
+                        M->vals[p] = M->vals[p] + za/2;
+                        break;
+                    }
+                }
+                // it the col 'j' has not been initialized yet
+                // introduce the contribution 'z'
+                if (p == t)
+                {
+                    M->vals[p] = za/2;
+                    M->cols[p] = j;
+                    t = t + 1;
+                }
+                // correct the configuration
+                vA[k] += 2;
+                vA[l] -= 1;
+                vA[q] -= 1;
+            }
+        }
+        // Rule : Creation on k s / Annihilation on q q
+        // ONLY IN CASE k + s = 2 * q
+        for (q = 0; q < Nla; q++)
+        {
+            for (k = 0; k < Nla; k++)
+            {
+                // Avoid repeating/forbidden rules
+                s = 2 * q - k;
+                if (q == k || s < 0 || s >= k) continue;
+                if (vA[k] < 1 || vA[s] < 1) continue;
+
+                // compute bosonic factor from op. action
+                bosef = sqrt((double)vA[k]*vA[s]*(vA[q]+1)*(vA[q]+2));
+                // assemble the configuration according to action of op.
+                vA[k] -= 1;
+                vA[s] -= 1;
+                vA[q] += 2;
+                // Compute col index 'j'
+                j = BBgetIndex_A(S,n,ib,vA);
+                // value to be set in the matrix at col 'j'
+                // factor 2 counts for the symmetry k-s
+                za = 2 * ga * bosef;
+                // Check in the current row if the col 'j' has
+                // already been initialized.  Add contribution
+                for (p = M->rows[i]; p < t; p++)
+                {
+                    if (j == M->cols[p])
+                    {
+                        M->vals[p] = M->vals[p] + za/2;
+                        break;
+                    }
+                }
+                // it the col 'j' has not been initialized yet
+                // we get p = t introduce the contribution 'z'
+                if (p == t)
+                {
+                    M->vals[p] = za/2;
+                    M->cols[p] = j;
+                    t = t + 1;
+                    // update the index of the last column initialized
+                }
+                vA[k] += 1;
+                vA[s] += 1;
+                vA[q] -= 2;
+            }
+        }
+        // Rule : Creation on k s / Annihilation on q l
+        // ONLY IN CASE k + s = q + l
+        for (k = 0; k < Nla; k++)
+        {
+            if (vA[k] < 1) continue;
+            for (s = k + 1; s < Nla; s++)
+            {
+                if (vA[s] < 1) continue;
+                for (q = 0; q < Nla; q++)
+                {
+                    if (q == s || q == k) continue;
+                    l = k + s - q;
+                    if (l < 0 || l >= q ) continue;
+
+                    bosef = sqrt((double)vA[k]*vA[s]*(vA[q]+1)*(vA[l]+1));
+                    vA[k] -= 1;
+                    vA[s] -= 1;
+                    vA[q] += 1;
+                    vA[l] += 1;
+                    j = BBgetIndex_A(S,n,ib,vA);
+                    za = 4 * ga * bosef;
+                    // Check in the current row if the col 'j' has
+                    // already been initialized.  Add contribution
+                    for (p = M->rows[i]; p < t; p++)
+                    {
+                        if (j == M->cols[p])
+                        {
+                            M->vals[p] = M->vals[p] + za/2;
+                            break;
+                        }
+                    }
+                    // it the col 'j' has not been initialized yet
+                    // introduce the contribution 'z'
+                    if (p == t)
+                    {
+                        M->vals[p] = za/2;
+                        M->cols[p] = j;
+                        t = t + 1;
+                        // update the index of the last column initialized
+                    }
+                    vA[k] += 1;
+                    vA[s] += 1;
+                    vA[q] -= 1;
+                    vA[l] -= 1;
+
+                }       // Finish q
+            }           // Finish s
+        }               // Finish k
+
+
+
+        /*************************************************************
+         **                                                         **
+         **                                                         **
+         **               INTERACTION AMONG B-SPECIES               **
+         **                                                         **
+         **                                                         **
+         *************************************************************/
+
+        // Rule : Creation on k k / Annihilation on q l
+        // ONLY IN CASE q + l = 2 * k
+        for (k = 0; k < Nlb; k++)
+        {
+            if (vB[k] < 2) continue;
+            for (q = 0; q < Nlb; q++)
+            {
+                l = 2 * k - q;
+                // Avoid repeating/forbidden rules
+                if (q == k || l < 0 || l >= q) continue;
+
+                // compute bosonic factor from op. action
+                bosef = sqrt((double)vB[k]*(vB[k]-1)*(vB[q]+1)*(vB[l]+1));
+                // assemble the configuration according to action of op.
+                vB[k] -= 2;
+                vB[l] += 1;
+                vB[q] += 1;
+                // Compute col index in 'j'
+                j = BBgetIndex_B(S,n,ia,vB);
+                // value to be set in the matrix at col 'j'
+                // factor 2 counts for the symmetry q-l
+                // justifying the choice for only l > q
+                zb = 2 * gb * bosef;
+                // Check in the current row if the col 'j' has
+                // already appeared. Then add its contribution
+                for (p = M->rows[i]; p < t; p++)
+                {
+                    if (j == M->cols[p])
+                    {
+                        M->vals[p] = M->vals[p] + zb/2;
+                        break;
+                    }
+                }
+                // it the col 'j' has not been initialized yet
+                // introduce the contribution 'z'
+                if (p == t)
+                {
+                    M->vals[p] = zb/2;
+                    M->cols[p] = j;
+                    t = t + 1;
+                }
+                // correct the configuration
+                vB[k] += 2;
+                vB[l] -= 1;
+                vB[q] -= 1;
+            }
+        }
+        // Rule : Creation on k s / Annihilation on q q
+        // ONLY IN CASE k + s = 2 * q
+        for (q = 0; q < Nlb; q++)
+        {
+            for (k = 0; k < Nlb; k++)
+            {
+                // Avoid repeating/forbidden rules
+                s = 2 * q - k;
+                if (q == k || s < 0 || s >= k) continue;
+                if (vB[k] < 1 || vB[s] < 1) continue;
+
+                // compute bosonic factor from op. action
+                bosef = sqrt((double)vB[k]*vB[s]*(vB[q]+1)*(vB[q]+2));
+                // assemble the configuration according to action of op.
+                vB[k] -= 1;
+                vB[s] -= 1;
+                vB[q] += 2;
+                // Compute col index 'j'
+                j = BBgetIndex_B(S,n,ia,vB);
+                // value to be set in the matrix at col 'j'
+                // factor 2 counts for the symmetry k-s
+                zb = 2 * gb * bosef;
+                // Check in the current row if the col 'j' has
+                // already been initialized.  Add contribution
+                for (p = M->rows[i]; p < t; p++)
+                {
+                    if (j == M->cols[p])
+                    {
+                        M->vals[p] = M->vals[p] + zb/2;
+                        break;
+                    }
+                }
+                // it the col 'j' has not been initialized yet
+                // we get p = t introduce the contribution 'z'
+                if (p == t)
+                {
+                    M->vals[p] = zb/2;
+                    M->cols[p] = j;
+                    t = t + 1;
+                    // update the index of the last column initialized
+                }
+                vB[k] += 1;
+                vB[s] += 1;
+                vB[q] -= 2;
+            }
+        }
+        // Rule : Creation on k s / Annihilation on q l
+        // ONLY IN CASE k + s = q + l
+        for (k = 0; k < Nlb; k++)
+        {
+            if (vB[k] < 1) continue;
+            for (s = k + 1; s < Nlb; s++)
+            {
+                if (vB[s] < 1) continue;
+                for (q = 0; q < Nlb; q++)
+                {
+                    if (q == s || q == k) continue;
+                    l = k + s - q;
+                    if (l < 0 || l >= q ) continue;
+
+                    bosef = sqrt((double)vB[k]*vB[s]*(vB[q]+1)*(vB[l]+1));
+                    vB[k] -= 1;
+                    vB[s] -= 1;
+                    vB[q] += 1;
+                    vB[l] += 1;
+                    j = BBgetIndex_B(S,n,ia,vB);
+                    zb = 4 * gb * bosef;
+                    // Check in the current row if the col 'j' has
+                    // already been initialized.  Add contribution
+                    for (p = M->rows[i]; p < t; p++)
+                    {
+                        if (j == M->cols[p])
+                        {
+                            M->vals[p] = M->vals[p] + zb/2;
+                            break;
+                        }
+                    }
+                    // it the col 'j' has not been initialized yet
+                    // introduce the contribution 'z'
+                    if (p == t)
+                    {
+                        M->vals[p] = zb/2;
+                        M->cols[p] = j;
+                        t = t + 1;
+                        // update the index of the last column initialized
+                    }
+                    vB[k] += 1;
+                    vB[s] += 1;
+                    vB[q] -= 1;
+                    vB[l] -= 1;
+                }       // Finish q
+            }           // Finish s
+        }               // Finish k
+
+
+
+        /************************************************************
+         **                                                        **
+         **                                                        **
+         **                INTERSPECIES INTERACTION                **
+         **                                                        **
+         **                                                        **
+         ************************************************************/
+        for (k = 0; k < Nla; k++)
+        {
+            for (s = 0; s < Nlb; s++)
+            {
+                // MOMENTUM EXCHANGED BY q UNITS
+                if (s + k < Nlb) low = -k;
+                else             low = -(Nlb - 1 - s);
+                if (k + s < Nla) up  = s;
+                else             up = Nla-1-k;
+                for(q = low; q <= up; q++)
+                {
+                    if (q == 0) continue; // no momentum exchanged
+                    if (vA[k+q]*vB[s-q] == 0) continue;
+                    bosef = sqrt((double)vA[k+q]*vB[s-q]*(vA[k]+1)*(vB[s]+1));
+                    vA[k+q] -= 1;
+                    vA[k]   += 1;
+                    vB[s-q] -= 1;
+                    vB[s]   += 1;
+                    j = BBgetIndex(S,vA,vB);
+                    zab = gab * bosef;
+                    // Check in the current row if the col 'j' has
+                    // already been initialized.  Add contribution
+                    for (p = M->rows[i]; p < t; p++)
+                    {
+                        if (j == M->cols[p])
+                        {
+                            M->vals[p] = M->vals[p] + zab;
+                            break;
+                        }
+                    }
+                    // it the col 'j' has not been initialized yet
+                    // introduce the contribution 'z'
+                    if (p == t)
+                    {
+                        M->vals[p] = zab;
+                        M->cols[p] = j;
+                        t = t + 1;
+                        // update the index of the last column initialized
+                    }
+                    vA[k+q] += 1;
+                    vA[k]   -= 1;
+                    vB[s-q] += 1;
+                    vB[s]   -= 1;
+                }
+            }
+        }
+
+        // SANITY CHECK
+        if (t != M->rows[i+1])
+        {
+            printf("\n\nERROR : The number of elements set in the ");
+            printf("row %d does not correspond to the stride predicted ",i);
+            printf("when computing the number of NonZero Elements(NZE)\n");
+            printf("Expected %d but %d NZE were found\n\n",M->rows[i+1],t);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    free(vA); free(vB); free(NNZrow);
+    return M;
+}
+
+
+
+HConfMat bosefermiH(BFCompoundSpace S, Carray HoB, Carray HoF, double g [])
+{
+
+/** ASSEMBLE (SPARSE) HAMILTONIAN MATRIX OF 2-SPECIES BOSE-FERMI MIXTURE
+    ====================================================================
+    First compute the number of non-zero elements. If the memory
+    required is less than the memory allowed by HMAT_MEM_TOL  it
+    return a structure with the sparse matrix                **/
+
+    int
+        i,
+        j,
+        k,
+        l,
+        s,
+        q,
+        n,
+        p,
+        t,
+        iF,
+        up,
+        low,
+        Nlf,
+        Nlb,
+        nnze,
+        fermif;
+    double
+        gb,
+        gbf,
+        bosef;
+    double complex
+        w,
+        zb,
+        zbf;
+    Iarray
+        vB,
+        NNZrow;
+    Farray
+        vF;
+    HConfMat
+        M;
+
+    Nlf = 2 * S->lmaxF + 1; // total number of Individual Particle States A
+    Nlb = 2 * S->lmaxB + 1; // total number of Individual Particle States B
+
+    gb = g[0];
+    gbf = g[2];
+
+    vF = farrDef(Nlf);  // vector of occupation numbers A
+    vB = iarrDef(Nlb);  // vector of occupation numbers B
+
+    // Compute number of  nonzero  entries to allocate sparse
+    // matrix structure including the nonzero entries per row
+    NNZrow = iarrDef(S->size);
+    nnze = NNZ_PerRow_BFMIX(S,NNZrow);
+
+    if (nnze < 0)
+    {
+        // Two problems may have occurred in computing number of nonzero
+        // elements of Hamiltonian matrix : 1. 'nnze' exceeded INT_MAX
+        // 2. Memory required exceeded the tolerance
+        free(vF);
+        free(vB);
+        free(NNZrow);
+        return NULL;
+    }
+
+    M = allocEmptyMat(S->size,nnze);
+
+    // initialize with arbitrary values
+    for (i = 0; i < nnze; i++)
+    {
+        M->vals[i] = 0;
+        M->cols[i] = -1;
+    }
+
+    // Configure the strides to find in the sparse storage
+    // vectors of values and columns where each row begins
+    M->rows[0] = 0;
+    for (i = 0; i < S->size; i++) M->rows[i+1] = M->rows[i] + NNZrow[i];
+
+    // 't' variable tracks what was the last 'index' used
+    // in vector of values and columns in sparse matrix
+    t = 0;
+
+    for (i = 0; i < S->size; i++)
+    {
+        w = 0;
+        zb = 0;
+        zbf = 0;
+
+        // copy current configuration occupations
+        BFgetConfigs(i,S,vB,vF);
+
+        // Intraspecies interactions neither change the subspace
+        // nor influence the individual hashing index.
+        n = BFsubIndex(S,vB);
+        iF = FgetIndex(S->lmaxF,S->sub[n].sizeF,S->sub[n].htf,vF);
+
+        // KINECT ENERGY - creation and annihilation at k
+        for (k = 0; k < Nlf; k++) w = w + HoF[k]*vF[k];
+        for (k = 0; k < Nlb; k++) w = w + HoB[k]*vB[k];
+
+        // Rule : Creation on k k / Annihilation on k k
+        for (k = 0; k < Nlb; k++)
+        {
+            bosef = vB[k] * (vB[k] - 1);
+            zb = zb + gb * bosef;
+        }
+        // Rule : Creation on k s / Annihilation on k s
+        for (k = 0; k < Nlb; k++)
+        {
+            if (vB[k] < 1) continue;
+            for (s = k + 1; s < Nlb; s++)
+            {
+                bosef = vB[k] * vB[s];
+                zb = zb + 4 * gb * bosef;
+            }
+        }
+        // INTERSPECIES INTERACTION WITHOUT MOMENTUM EXCHANGE
+        for (k = 0; k < Nlb; k++)
+        {
+            for (s = 0; s < Nlf; s++)
+            {
+                bosef = vB[k]*vF[s];
+                zbf = zbf + gbf * bosef;
+            }
+        }
+
+        M->cols[t] = i;
+        M->vals[t] = w + zb/2 + zbf;
+        t = t + 1;
+
+        /************************************************************
+         **                                                        **
+         **                                                        **
+         **                INTERACTION AMONG BOSONS                **
+         **                off-diagonal  terms only                **
+         **                                                        **
+         **                                                        **
+         ************************************************************/
+
+        // Rule : Creation on k k / Annihilation on q l
+        // ONLY IN CASE q + l = 2 * k
+        for (k = 0; k < Nlb; k++)
+        {
+            if (vB[k] < 2) continue;
+            for (q = 0; q < Nlb; q++)
+            {
+                l = 2 * k - q;
+                // Avoid repeating/forbidden rules
+                if (q == k || l < 0 || l >= q) continue;
+
+                // compute bosonic factor from op. action
+                bosef = sqrt((double)vB[k]*(vB[k]-1)*(vB[q]+1)*(vB[l]+1));
+                // assemble the configuration according to action of op.
+                vB[k] -= 2;
+                vB[l] += 1;
+                vB[q] += 1;
+                // Compute col index in 'j'
+                j = BFgetIndex_B(S,n,iF,vB);
+                // value to be set in the matrix at col 'j'
+                // factor 2 counts for the symmetry q-l
+                // justifying the choice for only l > q
+                zb = 2 * gb * bosef;
+                // Check in the current row if the col 'j' has
+                // already appeared. Then add its contribution
+                for (p = M->rows[i]; p < t; p++)
+                {
+                    if (j == M->cols[p])
+                    {
+                        M->vals[p] = M->vals[p] + zb/2;
+                        break;
+                    }
+                }
+                // it the col 'j' has not been initialized yet
+                // introduce the contribution 'z'
+                if (p == t)
+                {
+                    M->vals[p] = zb/2;
+                    M->cols[p] = j;
+                    t = t + 1;
+                }
+                // correct the configuration
+                vB[k] += 2;
+                vB[l] -= 1;
+                vB[q] -= 1;
+            }
+        }
+        // Rule : Creation on k s / Annihilation on q q
+        // ONLY IN CASE k + s = 2 * q
+        for (q = 0; q < Nlb; q++)
+        {
+            for (k = 0; k < Nlb; k++)
+            {
+                // Avoid repeating/forbidden rules
+                s = 2 * q - k;
+                if (q == k || s < 0 || s >= k) continue;
+                if (vB[k] < 1 || vB[s] < 1) continue;
+
+                // compute bosonic factor from op. action
+                bosef = sqrt((double)vB[k]*vB[s]*(vB[q]+1)*(vB[q]+2));
+                // assemble the configuration according to action of op.
+                vB[k] -= 1;
+                vB[s] -= 1;
+                vB[q] += 2;
+                // Compute col index 'j'
+                j = BFgetIndex_B(S,n,iF,vB);
+                // value to be set in the matrix at col 'j'
+                // factor 2 counts for the symmetry k-s
+                zb = 2 * gb * bosef;
+                // Check in the current row if the col 'j' has
+                // already been initialized.  Add contribution
+                for (p = M->rows[i]; p < t; p++)
+                {
+                    if (j == M->cols[p])
+                    {
+                        M->vals[p] = M->vals[p] + zb/2;
+                        break;
+                    }
+                }
+                // it the col 'j' has not been initialized yet
+                // we get p = t introduce the contribution 'z'
+                if (p == t)
+                {
+                    M->vals[p] = zb/2;
+                    M->cols[p] = j;
+                    t = t + 1;
+                    // update the index of the last column initialized
+                }
+                vB[k] += 1;
+                vB[s] += 1;
+                vB[q] -= 2;
+            }
+        }
+        // Rule : Creation on k s / Annihilation on q l
+        // ONLY IN CASE k + s = q + l
+        for (k = 0; k < Nlb; k++)
+        {
+            if (vB[k] < 1) continue;
+            for (s = k + 1; s < Nlb; s++)
+            {
+                if (vB[s] < 1) continue;
+                for (q = 0; q < Nlb; q++)
+                {
+                    if (q == s || q == k) continue;
+                    l = k + s - q;
+                    if (l < 0 || l >= q ) continue;
+
+                    bosef = sqrt((double)vB[k]*vB[s]*(vB[q]+1)*(vB[l]+1));
+                    vB[k] -= 1;
+                    vB[s] -= 1;
+                    vB[q] += 1;
+                    vB[l] += 1;
+                    j = BFgetIndex_B(S,n,iF,vB);
+                    zb = 4 * gb * bosef;
+                    // Check in the current row if the col 'j' has
+                    // already been initialized.  Add contribution
+                    for (p = M->rows[i]; p < t; p++)
+                    {
+                        if (j == M->cols[p])
+                        {
+                            M->vals[p] = M->vals[p] + zb/2;
+                            break;
+                        }
+                    }
+                    // it the col 'j' has not been initialized yet
+                    // introduce the contribution 'z'
+                    if (p == t)
+                    {
+                        M->vals[p] = zb/2;
+                        M->cols[p] = j;
+                        t = t + 1;
+                        // update the index of the last column initialized
+                    }
+                    vB[k] += 1;
+                    vB[s] += 1;
+                    vB[q] -= 1;
+                    vB[l] -= 1;
+                }       // Finish q
+            }           // Finish s
+        }               // Finish k
+
+        /************************************************************
+         **                                                        **
+         **                                                        **
+         **                INTERSPECIES INTERACTION                **
+         **                                                        **
+         **                                                        **
+         ************************************************************/
+        for (s = 0; s < Nlf; s++)
+        {
+            for (k = 0; k < Nlb; k++)
+            {
+                // MOMENTUM EXCHANGED BY q UNITS
+                if (s + k < Nlf) low = -k;
+                else             low = -(Nlf - 1 - s);
+                if (k + s < Nlb) up = s;
+                else             up = Nlb-1-k;
+                for(q = low; q <= up; q++)
+                {
+                    // Avoid case of without momentum exchanged
+                    if (q == 0) continue;
+                    // avoid unpopulated states and creation on
+                    // already occupied fermionic state
+                    if (vB[k+q]*vF[s-q] == 0 || vF[s] > 0) continue;
+                    // result of bosonic operators action
+                    bosef  = sqrt((double)vB[k+q]*(vB[k]+1));
+                    vB[k+q] -= 1;
+                    vB[k]   += 1;
+                    // fermi factor is taken into account moving the
+                    // operators and inverting sign at each crossing
+                    // among them until find the right place
+                    fermif = 1;
+                    for (l = 0; l < s-q; l++)
+                    {
+                        if (vF[l] == 1) fermif = (-1)*fermif;
+                    }
+                    vF[s-q] = 0;
+                    for (l = 0; l < s; l++)
+                    {
+                        if (vF[l] == 1) fermif = (-1)*fermif;
+                    }
+                    vF[s] = 1;
+                    j = BFgetIndex(S,vB,vF);
+                    zbf = gbf * bosef * fermif;
+                    // Check in the current row if the col 'j' has
+                    // already been initialized.  Add contribution
+                    for (p = M->rows[i]; p < t; p++)
+                    {
+                        if (j == M->cols[p])
+                        {
+                            M->vals[p] = M->vals[p] + zbf;
+                            break;
+                        }
+                    }
+                    // it the col 'j' has not been initialized yet
+                    // introduce the contribution 'z'
+                    if (p == t)
+                    {
+                        M->vals[p] = zbf;
+                        M->cols[p] = j;
+                        t = t + 1;
+                        // update the index of the last column initialized
+                    }
+                    vB[k+q] += 1;
+                    vB[k]   -= 1;
+                    vF[s-q]  = 1;
+                    vF[s]    = 0;
+                }
+            }
+        }
+
+        // SANITY CHECK
+        if (t != M->rows[i+1])
+        {
+            printf("\n\nERROR : The number of elements set in the ");
+            printf("row %d does not correspond to the stride predicted ",i);
+            printf("when computing the number of NonZero Elements(NZE)\n");
+            printf("Expected %d but %d NZE were found\n\n",M->rows[i+1],t);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    free(vF); free(vB); free(NNZrow);
     return M;
 }
 
@@ -1054,7 +2476,8 @@ void mixture_actH(CompoundSpace S, Carray HoA, Carray HoB, double g [],
                     {
                         if (q == 0) continue; // no momentum exchanged
                         if (vA[k+q]*vB[s-q] == 0) continue;
-                        bosef = sqrt((double)vA[k+q]*vB[s-q]*(vA[k]+1)*(vB[s]+1));
+                        bosef = sqrt((double)vA[k+q]*vB[s-q]*\
+                                     (vA[k]+1)*(vB[s]+1));
                         vA[k+q] -= 1;
                         vA[k]   += 1;
                         vB[s-q] -= 1;
@@ -1068,73 +2491,14 @@ void mixture_actH(CompoundSpace S, Carray HoA, Carray HoB, double g [],
                     }
                 }
             }
-            // ILUSTRATION HOPPING (application to stacked rings)
-            /*
-            for (k = 0; k < minNl; k++)
-            {
-                // NO MOMENTUM EXCHANGED
-                if (lmaxA > lmaxB)
-                {
-                    // s is the offset between states with same momentum
-                    s = k + (lmaxA - lmaxB);
-                    // creation in a / annihi. in b
-                    if (vA[s] > 0)
-                    {
-                        bosef = sqrt((double)vA[s]*(vB[k]+1));
-                        vA[s] -= 1;
-                        vB[k] += 1;
-                        j = BBgetIndex(S,vA,vB);
-                        zab = zab + gab * bosef * Cin[j];
-                        vA[s] += 1;
-                        vB[k] -= 1;
-                    }
-                    // Hermitian conjugate creation in b / annihi. in a
-                    if (vB[k] > 0)
-                    {
-                        bosef = sqrt((double)(vA[s]+1)*vB[k]);
-                        vA[s] += 1;
-                        vB[k] -= 1;
-                        j = BBgetIndex(S,vA,vB);
-                        zab = zab + gab * bosef * Cin[j];
-                        vA[s] -= 1;
-                        vB[k] += 1;
-                    }
-                }
-                else
-                {
-                    // s is the offset between states with same momentum
-                    s = k + (lmaxB - lmaxA);
-                    // creation in a / annihi. in b
-                    if (vA[k] > 0)
-                    {
-                        bosef = sqrt((double)vA[k]*(vB[s]+1));
-                        vA[k] -= 1;
-                        vB[s] += 1;
-                        j = BBgetIndex(S,vA,vB);
-                        zab = zab + gab * bosef * Cin[j];
-                        vA[k] += 1;
-                        vB[s] -= 1;
-                    }
-                    // Hermitian conjugate creation in b / annihi. in a
-                    if (vB[s] > 0)
-                    {
-                        bosef = sqrt((double)(vA[k]+1)*vB[s]);
-                        vA[k] += 1;
-                        vB[s] -= 1;
-                        j = BBgetIndex(S,vA,vB);
-                        zab = zab + gab * bosef * Cin[j];
-                        vA[k] -= 1;
-                        vB[s] += 1;
-                    }
-                }
-            }
-            */
 
             Cout[i] = w + za/2 + zb/2 + zab;
-        }
+
+        }   // FINISH LOOP OVER SPACE DIMENSION
 
         free(vA); free(vB);
-    }
+
+    }   // FINISH PARALLEL REGION
 }
 
 
@@ -1218,8 +2582,6 @@ void bosefermi_actH(BFCompoundSpace S, Carray HoB, Carray HoF, double g [],
             // KINECT ENERGY - creation and annihilation at k
             for (k = 0; k < Nlb; k++) w = w + HoB[k]*vB[k]*Cin[i];
             for (k = 0; k < Nlf; k++) w = w + HoF[k]*vF[k]*Cin[i];
-
-
 
             /************************************************************
              **                                                        **
@@ -1330,8 +2692,6 @@ void bosefermi_actH(BFCompoundSpace S, Carray HoB, Carray HoF, double g [],
                 }           // Finish s
             }               // Finish k
 
-
-
             /************************************************************
              **                                                        **
              **                                                        **
@@ -1379,20 +2739,22 @@ void bosefermi_actH(BFCompoundSpace S, Carray HoB, Carray HoF, double g [],
                         }
                         vF[s] = 1;
                         j = BFgetIndex(S,vB,vF);
-                        zbf = zbf + gbf * bosef * Cin[j];
+                        zbf = zbf + gbf * bosef * fermif * Cin[j];
                         vB[k+q] += 1;
-                        vB[k] -= 1;
-                        vF[s-q] = 1;
-                        vF[s] = 0;
+                        vB[k]   -= 1;
+                        vF[s-q]  = 1;
+                        vF[s]    = 0;
                     }
                 }
             }
 
             Cout[i] = w + zb/2 + zbf;
-        }
+
+        }   // FINISH LOOP OVER SPACE DIMENSION
 
         free(vF); free(vB);
-    }
+
+    }   // FINISH PARALLEL REGION
 }
 
 
