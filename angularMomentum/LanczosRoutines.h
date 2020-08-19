@@ -334,8 +334,8 @@ void impRestart(int nc, int kp, Cmatrix lvec, Carray diag, Carray offdiag,
 
 
 
-int LNCZS_HMAT(int lm, int nc, HConfMat H, Carray diag, Carray offdiag,
-               Cmatrix lvec)
+int LNCZS_HMAT(int lm, int Npar, int nc, HConfMat H, Carray diag,
+               Carray offdiag, Cmatrix lvec)
 {
 
 /** IMPROVED LANCZOS ITERATIONS WITH REORTHOGONALIZATION USING H. MATRIX
@@ -352,23 +352,24 @@ int LNCZS_HMAT(int lm, int nc, HConfMat H, Carray diag, Carray offdiag,
         i,
         j,
         k,
+        Niter,
         threadId,
         nthreads;
-
     double
         tol,
         maxCheck,
-        energy;
-
+        energy,
+        extraB;
     double complex
         hc_update;
-
     Carray
         HC,
         ortho;
 
     printf("\nLANCZOS ITERATIONS\n");
     printf(" * Progress");
+
+    Niter = 0;
 
     // Check for a source of breakdown in the algorithm to do not
     // divide by zero. Instead of zero use  a  tolerance (tol) to
@@ -416,16 +417,20 @@ int LNCZS_HMAT(int lm, int nc, HConfMat H, Carray diag, Carray offdiag,
 
         diag[i + 1] = carrDot(nc,lvec[i+1],HC);
 
+        // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
         if ((i+1) % 10 == 0)
         {
             if (stopLanczos(i+1,diag,offdiag,&energy))
             {
+                printf(" | Energy per particle : %.7lf",energy/Npar);
                 free(HC);
                 free(ortho);
-                printf("\nACHIEVED CONVERGENCE FOR GROUND STATE ENERGY\n");
+                printf("\n============= FINISHED LANCZOS ITERATIONS\n");
                 return i+1;
             }
+            printf(" | Energy per particle : %.7lf",energy/Npar);
         }
+        // -------------------------------------------------------
 
         for (j = 0; j < nc; j++)
         {
@@ -454,10 +459,100 @@ int LNCZS_HMAT(int lm, int nc, HConfMat H, Carray diag, Carray offdiag,
             }
         }
 
+        Niter++;
         printf("\n  %3d/%d",i+1,lm);
     }
 
-    printf("\n===========   MAX. LANCZOS ITERATIONS REACHED\n");
+    /************************************************************************
+    ************   RESTART ITERATIONS TO IMPROVE LANCZOS SPACE   ************
+    *************************************************************************/
+
+    while (!stopLanczos(lm,diag,offdiag,&energy))
+    {
+        printf(" | Energy per particle : %.7lf",energy/Npar);
+        printf("\n------------- IMPLICIT RESTART");
+
+        // Implicit restart algorithm requires one extra Lanczos vector
+        extraB = carrNorm(nc,HC);                           // beta k+p
+        for (j = 0; j < nc; j++) HC[j] = HC[j] / extraB;    // Lvector : k+p+1
+
+        // ===================================================================
+        // Restart iterations in k = lm - lm/2
+        impRestart(nc,lm,lvec,diag,offdiag,extraB,HC);
+        for (i = lm - lm/2 - 1; i < lm - 1; i++)
+        {
+            offdiag[i] = carrNorm(nc,HC);
+
+            if (maxCheck < creal(offdiag[i])) maxCheck = creal(offdiag[i]);
+            // If method break return number of iterations achieved
+            if (creal(offdiag[i]) / maxCheck < tol)
+            {
+                free(HC);
+                free(ortho);
+                printf("\n\nWARNING : BREAKDOWN OCCURRED IN LANCZOS METHOD ");
+                printf("FOR TWO SPECIES BOSONIC MIXTURE\n\n");
+                return i;
+            }
+
+            for (j = 0; j < nc; j++) lvec[i+1][j] = HC[j] / offdiag[i];
+
+            // apply Hamiltonian in a vector from configurational basis
+            matmul(nc,H->rows,H->cols,H->vals,lvec[i+1],HC);
+
+            for (j = 0; j < nc; j++)
+            {
+                HC[j] = HC[j] - offdiag[i] * lvec[i][j];
+            }
+
+            diag[i + 1] = carrDot(nc,lvec[i + 1],HC);
+
+            // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
+            if ((i+1) % 10 == 0)
+            {
+                if (stopLanczos(i+1,diag,offdiag,&energy))
+                {
+                    printf(" | Energy per particle : %.7lf",energy/Npar);
+                    free(HC);
+                    free(ortho);
+                    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
+                    return i+1;
+                }
+                printf(" | Energy per particle : %.7lf",energy/Npar);
+            }
+            // -------------------------------------------------------
+
+            for (j = 0; j < nc; j++)
+            {
+                HC[j] = HC[j] - diag[i+1]*lvec[i+1][j];
+            }
+
+            // Additional re-orthogonalization procedure. The main process
+            // is parallelized because depending on the number  of Lanczos
+            // iterations it may be the most demanding time,  beating even
+            // the time to apply the Hamiltonian
+            for (j = 0; j < i + 2; j++) ortho[j] = carrDot(nc, lvec[j], HC);
+
+            #pragma omp parallel private(j,k,threadId,nthreads,hc_update)
+            {
+                threadId = omp_get_thread_num();
+                nthreads = omp_get_num_threads();
+
+                for (j = threadId; j < nc; j += nthreads)
+                {
+                    hc_update = HC[j];
+                    for (k = 0; k < i + 2; k++)
+                    {
+                        hc_update = hc_update - lvec[k][j] * ortho[k];
+                    }
+                    HC[j] = hc_update;
+                }
+            }
+            Niter++;
+            printf("\n  %3d/%d | %d",i+1,lm,Niter);
+        }
+    }
+
+    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
 
     free(ortho);
     free(HC);

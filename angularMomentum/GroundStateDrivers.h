@@ -443,25 +443,19 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
         j,
         nc,
         predictedIter;
-
     double
         GSenergy;
-
     Iarray
         * ht;
-
     Rarray
         d,
         e,
         eigvec;
-
     Carray
         diag,
         offdiag;
-
     Cmatrix
         lvec;
-
     HConfMat
         H;
 
@@ -501,30 +495,36 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
         return GSenergy;
     }
 
-    // In the case the system is too large that the memory required
-    // exceeded the tolerance, apply implicit restarts
+    // USE RESTARTS IF THE MEMORY FOR LANCZOS VECTORS WILL
+    // EXCEED THE TOLERANCE DEFINED BEFORE COMPLETING  THE
+    // DEFAULT NUMBER OF LANCZOS ITERATIONS 'MAX_LNCZS_IT'
+    // RESTART EVERY 20 ITERATIONS ACCUMULATED
     if (nc > MAX_LNCZS_IT && Niter < MAX_LNCZS_IT) Niter = 20;
 
-    // variables to call LAPACK routine. eigvec matrix is stored in
-    // a vector in row major order
-    d = rarrDef(Niter);
-    e = rarrDef(Niter);
-    eigvec = rarrDef(Niter * Niter);
-    // output of lanczos iterative method - Tridiagonal decomposition
-    diag = carrDef(Niter);
-    offdiag = carrDef(Niter);
+    // VARIABLES TO CALL LAPACK ROUTINE.
+    d = rarrDef(Niter);             // diagonal elements
+    e = rarrDef(Niter);             // off-diagonal elements
+    eigvec = rarrDef(Niter*Niter);  // eigenvectors along columns
+    
+    // OUTPUT OF LANCZOS ITERATIVE METHOD - TRIDIAGONAL DECOMPOSITION
+    diag = carrDef(Niter);      // diagonal elements
+    offdiag = carrDef(Niter);   // off-diagonal elements
     offdiag[Niter-1] = 0;
-    // Lanczos Vectors (organized by rows of the following matrix)
+
+    // LANCZOS VECTORS (ORGANIZED BY ROWS OF THE FOLLOWING MATRIX)
     lvec = cmatDef(Niter,nc);
-    // initiate date to call lanczos. The first vector is the input guess
+    // THE FIRST VECTOR IS THE INPUT GUESS
     for (i = 0; i < nc; i++) lvec[0][i] = C[i];
 
-    /***   CALL LANCZOS ITERATIONS   ***/
+    /***********************************
+     ***   CALL LANCZOS ITERATIONS   ***
+     ***********************************/
+
     predictedIter = Niter;
     if (H == NULL) Niter = LNCZS_HACT(Niter,nc,lmax,ht,Ho,g,diag,offdiag,lvec);
-    else           Niter = LNCZS_HMAT(Niter,nc,H,diag,offdiag,lvec);
+    else           Niter = LNCZS_HMAT(Niter,Npar,nc,H,diag,offdiag,lvec);
 
-    // Transfer data to use lapack routine
+    // TRANSFER DATA TO USE LAPACK ROUTINE
     for (k = 0; k < Niter; k++)
     {
         d[k] = creal(diag[k]);    // Supposed to be real
@@ -532,13 +532,17 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
         for (j = 0; j < Niter; j++) eigvec[k * Niter + j] = 0;
     }
 
-    /***   CALL LAPACK FOR TRIDIAGONAL MATRIX FROM LANCZOS OUTPUT   ***/
-    k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
-    if (k != 0)  LAPACK_PROBLEM(k,"BOSEBOSE_GS");
+    /**************************************************************
+     ***   CALL LAPACK FOR TRIDIAGONAL MATRIX DIAGONALIZATION   ***
+     **************************************************************/
 
-    GSenergy = d[0];
+    k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
+    if (k != 0) LAPACK_PROBLEM(k,"GROUND_STATE");
+
+    GSenergy = d[0]; // lowest energy eigenvalue
+
+    // UPDATE C WITH THE COEFFICIENTS OF GROUND STATE
     j = 0;
-    // Update C with the coefficients of ground state
     for (i = 0; i < nc; i++)
     {
         C[i] = 0;
@@ -571,35 +575,33 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
 {
 
 /** COMPUTE GROUND STATE OF TWO SPECIES BOSONIC MIXTURE USING LANCZOS 
-    INPUT/OUTPUT : C input guess / output ground state coefficients
-    RETURN : Lowest eigenvalue found **/
+    INPUT/OUTPUT : C input guess / output ground  state  coefficients
+    RETURN : Lowest eigenvalue found                              **/
 
     int
         i,
         k,
         j,
         nc,
+        Npar,
         predictedIter;
-
     double
         GSenergy;
-
     Rarray
         d,
         e,
         eigvec;
-
     Carray
         diag,
         offdiag;
-
     Cmatrix
         lvec;
-
     HConfMat
         H;
 
     printf("\n * EVALUATING GROUND STATE OF TWO SPECIES BOSONIC MIXTURE\n");
+
+    Npar = MixSpace->Na + MixSpace->Nb;
 
     nc = MixSpace->size;
     if (nc == 1)
@@ -623,6 +625,7 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
     // USE RESTARTS IF THE MEMORY FOR LANCZOS VECTORS WILL
     // EXCEED THE TOLERANCE DEFINED BEFORE COMPLETING  THE
     // DEFAULT NUMBER OF LANCZOS ITERATIONS 'MAX_LNCZS_IT'
+    // RESTART EVERY 20 ITERATIONS ACCUMULATED
     if (nc > MAX_LNCZS_IT && Niter < MAX_LNCZS_IT) Niter = 20;
 
     // VARIABLES TO CALL LAPACK DIAGONALIZATION OF TRIDIAGONAL MATRIX
@@ -652,7 +655,7 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
     }
     else
     {
-        Niter = LNCZS_HMAT(Niter,nc,H,diag,offdiag,lvec);
+        Niter = LNCZS_HMAT(Niter,Npar,nc,H,diag,offdiag,lvec);
     }
 
     // TRANSFER DATA TO USE LAPACK ROUTINE
@@ -663,14 +666,14 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
         for (j = 0; j < Niter; j++) eigvec[k * Niter + j] = 0;
     }
 
-    /******************************************************
-     ***   CALL LAPACK FOR TRIDIAGONAL LANCZOS OUTPUT   ***
-     ******************************************************/
+    /**************************************************************
+     ***   CALL LAPACK FOR TRIDIAGONAL MATRIX DIAGONALIZATION   ***
+     **************************************************************/
 
     k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
     if (k != 0)  LAPACK_PROBLEM(k,"BOSEBOSE_GS");
 
-    GSenergy = d[0];
+    GSenergy = d[0]; // lowest eigenvalue
 
     // UPDATE C WITH THE COEFFICIENTS OF GROUND STATE
     j = 0;
@@ -711,27 +714,25 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
         k,
         j,
         nc,
+        Npar,
         predictedIter;
-
     double
         GSenergy;
-
     Rarray
         d,
         e,
         eigvec;
-
     Carray
         diag,
         offdiag;
-
     Cmatrix
         lvec;
-
     HConfMat
         H;
 
     printf("\n * EVALUATING GROUND STATE OF BOSE-FERMI MIXTURE\n");
+
+    Npar = MixSpace->Nf + MixSpace->Nb;
 
     nc = MixSpace->size;
     if (MixSpace->size == 1)
@@ -752,37 +753,42 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
     if (H == NULL) printf("   Without set (sparse) Hamiltonian matrix\n");
     else           printf("   Using (sparse) Hamiltonian matrix\n");
 
-    // In the case the system is too large that the memory required
-    // exceeded the tolerance, apply implicit restarts
+    // USE RESTARTS IF THE MEMORY FOR LANCZOS VECTORS WILL
+    // EXCEED THE TOLERANCE DEFINED BEFORE COMPLETING  THE
+    // DEFAULT NUMBER OF LANCZOS ITERATIONS 'MAX_LNCZS_IT'
+    // RESTART EVERY 20 ITERATIONS ACCUMULATED
     if (nc > MAX_LNCZS_IT && Niter < MAX_LNCZS_IT) Niter = 20;
 
-    // variables to call LAPACK routine. eigvec matrix is stored in
-    // a vector in row major order
+    // VARIABLES TO CALL LAPACK ROUTINE
     d = rarrDef(Niter);
     e = rarrDef(Niter);
     eigvec = rarrDef(Niter * Niter);
-    // output of lanczos iterative method - Tridiagonal decomposition
+
+    // OUTPUT OF LANCZOS ITERATIVE METHOD - TRIDIAGONAL DECOMPOSITION
     diag = carrDef(Niter);
     offdiag = carrDef(Niter);
     offdiag[Niter-1] = 0;
-    // Lanczos Vectors (organized by rows of the following matrix)
+
+    // LANCZOS VECTORS (organized by rows of the following matrix)
     lvec = cmatDef(Niter,nc);
-    // initiate date to call lanczos. The first vector is the input guess
+    // The first vector is the input guess
     for (i = 0; i < nc; i++) lvec[0][i] = C[i];
 
-    /***   CALL LANCZOS   ***/
+    /************************
+     ***   CALL LANCZOS   ***
+     ************************/
+
     predictedIter = Niter;
-    // Niter = LNCZS_BFMIX(Niter,MixSpace,HoB,HoF,g,diag,offdiag,lvec);
-    // Niter = LNCZS_HMAT(Niter,nc,H,diag,offdiag,lvec);
     if (H == NULL)
     {
         Niter = LNCZS_BFMIX(Niter,MixSpace,HoB,HoF,g,diag,offdiag,lvec);
     }
     else
     {
-        Niter = LNCZS_HMAT(Niter,nc,H,diag,offdiag,lvec);
+        Niter = LNCZS_HMAT(Niter,Npar,nc,H,diag,offdiag,lvec);
     }
-    // Transfer data to use lapack routine
+
+    // TRANSFER DATA TO USE LAPACK ROUTINE
     for (k = 0; k < Niter; k++)
     {
         d[k] = creal(diag[k]);    // Supposed to be real
@@ -790,13 +796,17 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
         for (j = 0; j < Niter; j++) eigvec[k * Niter + j] = 0;
     }
 
-    /***   CALL LAPACK FOR TRIDIAGONAL LANCZOS OUTPUT   ***/
-    k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
-    if (k != 0)  LAPACK_PROBLEM(k,"BOSEFERMI_GS");
+    /**************************************************************
+     ***   CALL LAPACK FOR TRIDIAGONAL MATRIX DIAGONALIZATION   ***
+     **************************************************************/
 
-    GSenergy = d[0];
+    k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
+    if (k != 0) LAPACK_PROBLEM(k,"BOSEFERMI_GS");
+
+    GSenergy = d[0]; // lowest eigenvalue
+
+    // UPDATE C WITH THE COEFFICIENTS OF GROUND STATE
     j = 0;
-    // Update C with the coefficients of ground state
     for (i = 0; i < nc; i++)
     {
         C[i] = 0;

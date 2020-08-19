@@ -239,7 +239,7 @@ int NNZ_PerRow(int N, int lmax, int mcsize, Iarray * ht, Iarray NNZrow)
         NNZrow[i] = next_i;
 
         MemReq = nnze*(sizeof(int)+sizeof(double complex))+mcsize*sizeof(int);
-        if (MemReq > MEMORY_TOL)
+        if (MemReq > HMAT_MEM_TOL)
         {
             // According to the pre-defined memory tolerance
             // the program will not store the Hamiltonian matrix
@@ -539,7 +539,7 @@ int NNZ_PerRow_BBMIX(CompoundSpace S, Iarray NNZrow)
         NNZrow[i] = next_i;
 
         MemReq = nnze*(sizeof(int)+sizeof(double complex))+mcsize*sizeof(int);
-        if (MemReq > MEMORY_TOL)
+        if (MemReq > HMAT_MEM_TOL)
         {
             // According to the pre-defined memory tolerance
             // the program will not store the Hamiltonian matrix
@@ -755,7 +755,7 @@ int NNZ_PerRow_BFMIX(BFCompoundSpace S, Iarray NNZrow)
         NNZrow[i] = next_i;
 
         MemReq = nnze*(sizeof(int)+sizeof(double complex))+mcsize*sizeof(int);
-        if (MemReq > MEMORY_TOL)
+        if (MemReq > HMAT_MEM_TOL)
         {
             // According to the pre-defined memory tolerance
             // the program will not store the Hamiltonian matrix
