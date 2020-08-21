@@ -12,7 +12,8 @@
 
 
 
-void parLine(char fname [], int line, int * N, int * lmax, int * L, double * g)
+void parLine(char fname [], int line, int * N, int * lmax, int * L,
+             double * v, double * g)
 {
 
 /** READ A LINE OF INPUT FILE TO SET THE PARAMETERS FOR 1 SPECIES **/
@@ -29,18 +30,19 @@ void parLine(char fname [], int line, int * N, int * lmax, int * L, double * g)
     for (i = 0; i < line; i++) ReachNewLine(in_file);
 
     // read parameters
-    fscanf(in_file,"%d",N);
-    fscanf(in_file,"%d",lmax);
-    fscanf(in_file,"%d",L);
-    fscanf(in_file,"%lf",g);
+    fscanf(in_file,"%d",N);     // Number of particles
+    fscanf(in_file,"%d",lmax);  // max. individual ang. momentum
+    fscanf(in_file,"%d",L);     // total angular momentum constraint
+    fscanf(in_file,"%lf",v);    // frame velocity
+    fscanf(in_file,"%lf",g);    // contact interaction strength parameter
 
     fclose(in_file);
 }
 
 
 
-void mixParLine(char fname [], int line, int * NA, int * lmaxA,
-                int * NB, int * lmaxB, int * L, double g [])
+void mixParLine(char fname [], int line, int * NA, int * lmaxA, int * NB,
+                int * lmaxB, int * L, double * v, double * mi, double g [])
 {
 
 /** READ A LINE OF INPUT FILE TO SET THE PARAMETERS FOR 2 SPECIES **/
@@ -57,14 +59,17 @@ void mixParLine(char fname [], int line, int * NA, int * lmaxA,
     for (i = 0; i < line; i++) ReachNewLine(in_file);
 
     // read parameters
-    fscanf(in_file,"%d",NA);
-    fscanf(in_file,"%d",lmaxA);
-    fscanf(in_file,"%d",NB);
-    fscanf(in_file,"%d",lmaxB);
-    fscanf(in_file,"%d",L);
-    fscanf(in_file,"%lf",&g[0]);
-    fscanf(in_file,"%lf",&g[1]);
-    fscanf(in_file,"%lf",&g[2]);
+    fscanf(in_file,"%d",NA);    // Num. of particles A (aways bosons)
+    fscanf(in_file,"%d",lmaxA); // max. individual ang. momemtum
+    fscanf(in_file,"%d",NB);    // Num. of particles B (bosons or fermions)
+    fscanf(in_file,"%d",lmaxB); // max. individual ang. momentum
+    fscanf(in_file,"%d",L);     // Total ang. momentum constraint
+    fscanf(in_file,"%lf",v);     // frame velocity
+    fscanf(in_file,"%lf",mi);    // mass imbalance
+    // CONTACT INTERACTION STRENGTH PARAMETERS
+    fscanf(in_file,"%lf",&g[0]);    // of particles A
+    fscanf(in_file,"%lf",&g[1]);    // of particles B (ignored for fermions)
+    fscanf(in_file,"%lf",&g[2]);    // interspecies interaction
 
     fclose(in_file);
 }
@@ -846,7 +851,8 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
     double
         l,
         g,
-        E0;
+        E0,
+        boost;
 
     char
         strnum[10],
@@ -879,7 +885,7 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         sprintf(strnum,"%d",i+1);
         // set up parameters of configurational
         // space in line 'i' of input file
-        parLine(in_fname,i,&Npar,&lmax,&total_mom,&g);
+        parLine(in_fname,i,&Npar,&lmax,&total_mom,&boost,&g);
         // number of configuration(nc) - config. space dimension
         nc = BFixedMom_mcsize(Npar,lmax,total_mom);
         printf("\n\n\nCOMPUTING GROUND STATE %d/%d | ",i+1,n_cases);
@@ -903,7 +909,7 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         Ho = carrDef(2*lmax+1);
         for (j = 0; j < 2*lmax+1; j++)
         {
-            l = 2 * PI * (j-lmax);
+            l = 2 * PI * ((j-lmax) - boost);
             Ho[j] = 0.5*l*l;
         }
         // initialize many-body state coefficients
@@ -953,7 +959,9 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
 
     double
         l,
-        E0;
+        E0,
+        boost,
+        MassImbal;
 
     double
         g[3];
@@ -993,7 +1001,8 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         // number of line as string to append in output file name
         sprintf(strnum,"%d",i+1);
         // set up parameters of config. space from line 'i' of input file
-        mixParLine(in_fname,i,&NparA,&lmaxA,&NparB,&lmaxB,&total_mom,g);
+        mixParLine(in_fname,i,&NparA,&lmaxA,&NparB,&lmaxB,&total_mom,
+                   &boost,&MassImbal,g);
         MixSpace = AllocCompBasis(NparA,NparB,lmaxA,lmaxB,total_mom);
         nc = MixSpace->size;
         printf("\n\n\nCOMPUTING GROUND STATE(MIXTURE) %d/%d\n",i+1,n_cases);
@@ -1020,14 +1029,14 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         HoA = carrDef(2*lmaxA+1);
         for (j = 0; j < 2*lmaxA+1; j++)
         {
-            l = 2 * PI * (j-lmaxA);
+            l = 2 * PI * ((j-lmaxA) - boost);
             HoA[j] = 0.5*l*l;
         }
         HoB = carrDef(2*lmaxB+1);
         for (j = 0; j < 2*lmaxB+1; j++)
         {
-            l = 2 * PI * (j-lmaxB);
-            HoB[j] = 0.5*l*l;
+            l = 2 * PI * ((j-lmaxB) - boost/MassImbal);
+            HoB[j] = 0.5*MassImbal*l*l;
         }
         // initialize many-body state coefficients
         C = carrDef(nc);
@@ -1080,7 +1089,9 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
 
     double
         l,
-        E0;
+        E0,
+        boost,
+        MassImbal;
 
     double
         g[3];
@@ -1120,7 +1131,8 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         // number of line as string to append in output file name
         sprintf(strnum,"%d",i+1);
         // set up parameters of config. space from line 'i' of input file
-        mixParLine(in_fname,i,&NparB,&lmaxB,&NparF,&lmaxF,&total_mom,g);
+        mixParLine(in_fname,i,&NparB,&lmaxB,&NparF,&lmaxF,&total_mom,
+                   &boost,&MassImbal,g);
         MixSpace = BoseFermiBasis(NparB,NparF,lmaxB,lmaxF,total_mom);
         nc = MixSpace->size;
         printf("\n\n\nCOMPUTING GROUND STATE(BOSE-FERMI) %d/%d\n",i+1,n_cases);
@@ -1135,7 +1147,7 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         coefMemory = nc * sizeof(double complex);
         if (nc > MAX_LNCZS_IT)
         {
-            lan_it = 2;
+            lan_it = 10;
             while (lan_it*coefMemory < MEMORY_TOL && lan_it < MAX_LNCZS_IT)
             {
                 lan_it++;
@@ -1146,14 +1158,14 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         HoB = carrDef(2*lmaxB+1);
         for (j = 0; j < 2*lmaxB+1; j++)
         {
-            l = 2 * PI * (j-lmaxB);
+            l = 2 * PI * ((j-lmaxB) - boost);
             HoB[j] = 0.5*l*l;
         }
         HoF = carrDef(2*lmaxF+1);
         for (j = 0; j < 2*lmaxF+1; j++)
         {
-            l = 2 * PI * (j-lmaxF);
-            HoF[j] = 0.5*l*l;
+            l = 2 * PI * ((j-lmaxF) - boost/MassImbal);
+            HoF[j] = 0.5*MassImbal*l*l;
         }
         // initialize many-body state coefficients
         C = carrDef(nc);
