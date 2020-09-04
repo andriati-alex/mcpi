@@ -153,16 +153,17 @@ def momentumCons_grad(c,lz):
         grad_im[k+lmax] = 2*cim[k+lmax]*(k+shift)
     return np.concatenate([grad_re,grad_im])
 
-def yrast(g,lz_init=0,lz_final=2,dl=0.01):
+def yrast(g,lz_init=0,lz_final=3,dl=0.01):
     lmax = 7
-    if (g > 1) : lmax = 10
-    if (g > 5) : lmax = 15
-    if (g > 10): lmax = 20
-    if (g > 15): lmax = 25
-    if (g > 20): lmax = 30
+    if (abs(g) > 1) : lmax = 10
+    if (abs(g) > 5) : lmax = 15
+    if (abs(g) > 10): lmax = 20
+    if (abs(g) > 15): lmax = 25
+    if (abs(g) > 20): lmax = 30
+    # random initial guess
     c0 = np.random.random(2*(2*lmax+1)) - 0.5
-    c0[int(c0.size/4)] = 2.
     c0 = c0 / np.sqrt(c0.dot(c0))
+    c0_last = c0
     lz_vals = np.arange(lz_init,lz_final+dl/2,dl)
     E = np.zeros(lz_vals.size)
     for i in range(lz_vals.size):
@@ -175,12 +176,21 @@ def yrast(g,lz_init=0,lz_final=2,dl=0.01):
          'fun' : momentumCons,
          'jac' : momentumCons_grad,
          'args':(lz,)}]
-        extra = {'ftol':1E-6,
+        extra = {'ftol':1E-8,
         'disp':False,
         'maxiter':1000}
-        res = opt.minimize(efunc,c0,method='SLSQP',jac=efunc_grad,
-                           args=(lz,g),constraints=cons,options=extra)
-        if (not res.success):
-            raise RuntimeError("Fail to converge for lz = {.2f}".format(lz))
+        try:
+            res = opt.minimize(efunc,c0,method='SLSQP',jac=efunc_grad,
+                  args=(lz,g),constraints=cons,options=extra)
+            if (not res.success):
+                raise RuntimeError("difficulty in lz = {:.2f}".format(lz))
+        except:
+            res = opt.minimize(efunc,c0_last,method='SLSQP',jac=efunc_grad,
+                  args=(lz,g),constraints=cons,options=extra)
+            if (not res.success):
+                print(res)
+                raise RuntimeError("Fail to converge for lz = {:.2f}".format(lz))
         E[i] = res.fun
+        c0_last = res.x*(1 + (np.random.random(c0.size)-0.5)/2)
+        c0_last = c0_last / np.sqrt(c0_last.dot(c0_last))
     return lz_vals, E
