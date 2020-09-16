@@ -12,67 +12,6 @@
 
 
 
-void parLine(char fname [], int line, int * N, int * lmax, int * L,
-             double * v, double * g)
-{
-
-/** READ A LINE OF INPUT FILE TO SET THE PARAMETERS FOR 1 SPECIES **/
-
-    int
-        i;
-
-    FILE
-        * in_file;
-
-    in_file = openFileRead(fname);
-
-    // jump lines to get to requested 'line'
-    for (i = 0; i < line; i++) ReachNewLine(in_file);
-
-    // read parameters
-    fscanf(in_file,"%d",N);     // Number of particles
-    fscanf(in_file,"%d",lmax);  // max. individual ang. momentum
-    fscanf(in_file,"%d",L);     // total angular momentum constraint
-    fscanf(in_file,"%lf",v);    // frame velocity
-    fscanf(in_file,"%lf",g);    // contact interaction strength parameter
-
-    fclose(in_file);
-}
-
-
-
-void mixParLine(char fname [], int line, int * NA, int * lmaxA, int * NB,
-                int * lmaxB, int * L, double * v, double * mi, double g [])
-{
-
-/** READ A LINE OF INPUT FILE TO SET THE PARAMETERS FOR 2 SPECIES **/
-
-    int
-        i;
-
-    FILE
-        * in_file;
-
-    in_file = openFileRead(fname);
-
-    // jump lines to get to requested 'line'
-    for (i = 0; i < line; i++) ReachNewLine(in_file);
-
-    // read parameters
-    fscanf(in_file,"%d",NA);    // Num. of particles A (aways bosons)
-    fscanf(in_file,"%d",lmaxA); // max. individual ang. momemtum
-    fscanf(in_file,"%d",NB);    // Num. of particles B (bosons or fermions)
-    fscanf(in_file,"%d",lmaxB); // max. individual ang. momentum
-    fscanf(in_file,"%d",L);     // Total ang. momentum constraint
-    fscanf(in_file,"%lf",v);     // frame velocity
-    fscanf(in_file,"%lf",mi);    // mass imbalance
-    // CONTACT INTERACTION STRENGTH PARAMETERS
-    fscanf(in_file,"%lf",&g[0]);    // of particles A
-    fscanf(in_file,"%lf",&g[1]);    // of particles B (ignored for fermions)
-    fscanf(in_file,"%lf",&g[2]);    // interspecies interaction
-
-    fclose(in_file);
-}
 
 
 
@@ -110,8 +49,6 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
     HConfMat
         H;
 
-    printf("\n * EVALUATING LOWEST ENERGY STATE WITH LANCZOS\n");
-
     // empty system
     if (Npar == 0) return 0;
 
@@ -128,8 +65,8 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
 
     ht = BAssembleHT(Npar,lmax,total_mom,nc);
     H = boseH(Npar,lmax,nc,ht,Ho,g);
-    if (H == NULL) printf("   Without set up (sparse) Hamiltonian matrix\n");
-    else           printf("   Using (sparse) Hamiltonian matrix\n");
+    if (H == NULL) printf("\nWithout set Hamiltonian matrix\n");
+    else           printf("\nUsing (sparse) Hamiltonian matrix\n");
 
     if (nc == 1)
     {
@@ -250,8 +187,6 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
     HConfMat
         H;
 
-    printf("\n * EVALUATING GROUND STATE OF TWO SPECIES BOSONIC MIXTURE\n");
-
     Npar = MixSpace->Na + MixSpace->Nb;
 
     nc = MixSpace->size;
@@ -270,8 +205,8 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
     // TRY TO ALLOCATE MATRIX. IF THE MEMORY REQUIRED EXCEED
     // THE TOLERANCE DEFINED RETURN NULL POINTER
     H = boseboseH(MixSpace,HoA,HoB,g);
-    if (H == NULL) printf("   Without set (sparse) Hamiltonian matrix\n");
-    else           printf("   Using (sparse) Hamiltonian matrix\n");
+    if (H == NULL) printf("\nWithout set Hamiltonian matrix\n");
+    else           printf("\nUsing (sparse) Hamiltonian matrix\n");
 
     // USE RESTARTS IF THE MEMORY FOR LANCZOS VECTORS WILL
     // EXCEED THE TOLERANCE DEFINED BEFORE COMPLETING  THE
@@ -381,8 +316,6 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
     HConfMat
         H;
 
-    printf("\n * EVALUATING GROUND STATE OF BOSE-FERMI MIXTURE\n");
-
     Npar = MixSpace->Nf + MixSpace->Nb;
 
     nc = MixSpace->size;
@@ -401,8 +334,8 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
     // TRY TO ALLOCATE MATRIX. IF THE MEMORY REQUIRED EXCEED
     // THE TOLERANCE DEFINED RETURN NULL POINTER
     H = bosefermiH(MixSpace,HoB,HoF,g);
-    if (H == NULL) printf("   Without set (sparse) Hamiltonian matrix\n");
-    else           printf("   Using (sparse) Hamiltonian matrix\n");
+    if (H == NULL) printf("\nWithout set Hamiltonian matrix\n");
+    else           printf("\nUsing (sparse) Hamiltonian matrix\n");
 
     // USE RESTARTS IF THE MEMORY FOR LANCZOS VECTORS WILL
     // EXCEED THE TOLERANCE DEFINED BEFORE COMPLETING  THE
@@ -510,9 +443,8 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         C,
         Ho;
 
-    FILE
-        * e_file,
-        * out_file;
+    FILE *
+        e_file;
 
     // set up name of file containing input data
     strcpy(in_fname,prefix);
@@ -521,9 +453,10 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
     // set up name of file containing energy
     strcpy(e_fname,"output/");
     strcat(e_fname,prefix);
-    strcat(e_fname,"_energy.dat");
+    strcat(e_fname,"_setup.dat");
     e_file = openFileWrite(e_fname);
-    fprintf(e_file,"# Energy per particle | Num. of Particles | L | g");
+    fprintf(e_file,"# Energy per particle | Num. of Particles | lmax ");
+    fprintf(e_file,"| total mom. | boost | g");
 
     for (i = 0; i < n_cases; i++)
     {
@@ -534,9 +467,7 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         parLine(in_fname,i,&Npar,&lmax,&total_mom,&boost,&g);
         // number of configuration(nc) - config. space dimension
         nc = BFixedMom_mcsize(Npar,lmax,total_mom);
-        printf("\n\n\nCOMPUTING GROUND STATE %d/%d | ",i+1,n_cases);
-        printf("N = %d lmax = %d L = %d g = %.10lf\n",Npar,lmax,total_mom,g);
-        printf("space dimension %d",nc);
+        printf("\n\n\n\n\nCOMPUTING GROUND STATE %d/%d",i+1,n_cases);
         sepline();
         // set up (default)  number of Lanczos iterations
         // respecting the memory allowed (MEMORY_TOL) and
@@ -563,9 +494,9 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         initGuess(nc,C);
         // call (main)routine to compute the ground state
         E0 = GROUND_STATE(lan_it,Npar,lmax,total_mom,C,Ho,g);
-        printf("\nAverage energy per particle = %.10lf",E0/Npar);
         // WRITE OUTPUT DATA IN A FILE
-        fprintf(e_file,"\n%.10E %d %d %.10E",E0/Npar,Npar,total_mom,g);
+        fprintf(e_file,"\n%.10E %d %d %d ",E0/Npar,Npar,lmax,total_mom);
+        fprintf(e_file,"%.10E %.10E",boost,g);
         if (full_output)
         {
             // set output file name
@@ -575,10 +506,7 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
             strcat(out_fname,strnum);
             strcat(out_fname,".dat");
             // open output file
-            out_file = openFileWrite(out_fname);
-            fprintf(out_file,"(%.10E+0.0j)",E0/Npar); // energy per particle
-            carrAppend(out_file,nc,C);  // ground state coefficients
-            fclose(out_file);
+            carr_txt(out_fname,nc,C);
         }
         free(C);
         free(Ho);
@@ -623,9 +551,8 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         HoA,
         HoB;
 
-    FILE
-        * e_file,
-        * out_file;
+    FILE *
+        e_file;
 
     CompoundSpace
         MixSpace;
@@ -637,10 +564,11 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
     // set name of file containing energy
     strcpy(e_fname,"output/");
     strcat(e_fname,prefix);
-    strcat(e_fname,"_energy.dat");
+    strcat(e_fname,"_setup.dat");
     e_file = openFileWrite(e_fname);
-    fprintf(e_file,"# Energy per particle | Npar A | Npar B | L | ");
-    fprintf(e_file,"ga | gb | gab");
+    fprintf(e_file,"# Energy per particle | N bosons A | lmax A ");
+    fprintf(e_file,"| N bosons B | lmax B | Total Mom. | boost B ");
+    fprintf(e_file,"| Ma / Mb | ga | gb | gab");
 
     for (i = 0; i < n_cases; i++)
     {
@@ -651,12 +579,8 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
                    &boost,&MassImbal,g);
         MixSpace = AllocCompBasis(NparA,NparB,lmaxA,lmaxB,total_mom);
         nc = MixSpace->size;
-        printf("\n\n\nCOMPUTING GROUND STATE(MIXTURE) %d/%d\n",i+1,n_cases);
-        printf("NA = %d lmaxA = %d | ",NparA,lmaxA);
-        printf("NB = %d lmaxB = %d | ",NparB,lmaxB);
-        printf("L = %d | space size = %d\n",total_mom,nc);
-        printf("Interaction ga = %.10lf | gb = %.10lf | ",g[0],g[1]);
-        printf("gab = %.10lf",g[2]);
+        printf("\n\n\n\n\nCOMPUTING GROUND STATE ");
+        printf("OF BOSONIC MIXTURE %d/%d",i+1,n_cases);
         sepline();
         // set up (default)  number of Lanczos iterations
         // respecting the memory allowed (MEMORY_TOL) and
@@ -689,10 +613,10 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         initGuess(nc,C);
         // call routine for the ground state
         E0 = BOSEBOSE_GS(lan_it,MixSpace,C,HoA,HoB,g);
-        printf("\nAverage energy per particle = %.10lf",E0/(NparA+NparB));
         // WRITE OUTPUT DATA IN A FILE
         fprintf(e_file,"\n%.10E ",E0/(NparA+NparB));
-        fprintf(e_file,"%d %d %d ",NparA,NparB,total_mom);
+        fprintf(e_file,"%d %d %d %d %d ",NparA,lmaxA,NparB,lmaxB,total_mom);
+        fprintf(e_file,"%.10E %.10E ",boost,MassImbal);
         fprintf(e_file,"%.10E %.10E %.10E",g[0],g[1],g[2]);
         if (full_output)
         {
@@ -703,10 +627,7 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
             strcat(out_fname,strnum);
             strcat(out_fname,".dat");
             // open output file
-            out_file = openFileWrite(out_fname);
-            fprintf(out_file,"(%.10E+0.0j)",E0/(NparA+NparB));
-            carrAppend(out_file,nc,C);
-            fclose(out_file);
+            carr_txt(out_fname,nc,C);
         }
         free(C);
         free(HoA);
@@ -753,9 +674,8 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         HoB,
         HoF;
 
-    FILE
-        * e_file,
-        * out_file;
+    FILE *
+        e_file;
 
     BFCompoundSpace
         MixSpace;
@@ -767,10 +687,11 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
     // set name of file containing energy
     strcpy(e_fname,"output/");
     strcat(e_fname,prefix);
-    strcat(e_fname,"_energy.dat");
+    strcat(e_fname,"_setup.dat");
     e_file = openFileWrite(e_fname);
-    fprintf(e_file,"# Energy per particle | N bosons | N fermions | L | ");
-    fprintf(e_file,"gb | gbf");
+    fprintf(e_file,"# Energy per particle | N bosons | lmax Bosons ");
+    fprintf(e_file,"| N Fermions | lmax Fermions | Total Mom. ");
+    fprintf(e_file,"| Boost Fermions | Mb / Mf | gb | gbf");
 
     for (i = 0; i < n_cases; i++)
     {
@@ -781,11 +702,8 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
                    &boost,&MassImbal,g);
         MixSpace = BoseFermiBasis(NparB,NparF,lmaxB,lmaxF,total_mom);
         nc = MixSpace->size;
-        printf("\n\n\nCOMPUTING GROUND STATE(BOSE-FERMI) %d/%d\n",i+1,n_cases);
-        printf("%d Bosons in lmax = %d | ",NparB,lmaxB);
-        printf("%d Fermions in lmax = %d | ",NparF,lmaxF);
-        printf("L = %d | space size = %d\n",total_mom,nc);
-        printf("Interaction gb = %.10lf | gbf = %.10lf",g[0],g[2]);
+        printf("\n\n\n\n\nCOMPUTING GROUND STATE ");
+        printf("OF BOSE-FERMI MIXTURE %d/%d",i+1,n_cases);
         sepline();
         // set up (default)  number of Lanczos iterations
         // respecting the memory allowed (MEMORY_TOL) and
@@ -818,24 +736,21 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         initGuess(nc,C);
         // call routine for the ground state
         E0 = BOSEFERMI_GS(lan_it,MixSpace,C,HoB,HoF,g);
-        printf("\nAverage energy per particle = %.10lf",E0/(NparB+NparF));
         // WRITE OUTPUT DATA IN A FILE
         fprintf(e_file,"\n%.10E ",E0/(NparB+NparF));
-        fprintf(e_file,"%d %d %d ",NparB,NparF,total_mom);
+        fprintf(e_file,"%d %d %d %d %d ",NparB,lmaxB,NparF,lmaxF,total_mom);
+        fprintf(e_file,"%.10E %.10E ",boost,MassImbal);
         fprintf(e_file,"%.10E %.10E",g[0],g[2]);
         if (full_output)
         {
-            // set file name for coefficients
+            // set output filename for coefficients
             strcpy(out_fname,"output/");
             strcat(out_fname,prefix);
             strcat(out_fname,"_job");
             strcat(out_fname,strnum);
             strcat(out_fname,".dat");
             // open output file
-            out_file = openFileWrite(out_fname);
-            fprintf(out_file,"(%.10E+0.0j)",E0/(NparB+NparF));
-            carrAppend(out_file,nc,C);
-            fclose(out_file);
+            carr_txt(out_fname,nc,C);
         }
         free(C);
         free(HoB);

@@ -247,7 +247,7 @@ double carrNorm(int n, Carray v)
 void carrNormalize(unsigned int n, Carray v)
 {
 
-/** Normalize vector v accorsing to L2 norm **/
+/** Normalize vector v according to L2 norm **/
 
     int
         i;
@@ -410,6 +410,203 @@ void carrAppend(FILE * f, int M, Carray v)
         if (imag >= 0) fprintf(f, "\n(%.15E+%.15Ej)",real,imag);
         else           fprintf(f, "\n(%.15E%.15Ej)",real,imag);
     }
+}
+
+
+
+void carr_txt(char fname [], int M, Carray v)
+{
+
+/** Record a array of complex elements in a text file **/
+
+    int
+        j;
+    double
+        real,
+        imag;
+    FILE *
+        data_file;
+
+    data_file = openFileWrite(fname);
+
+    for (j = 0; j < M - 1; j ++)
+    {
+        real = creal(v[j]);
+        imag = cimag(v[j]);
+        if (imag >= 0) fprintf(data_file, "(%.15E+%.15Ej)", real, imag);
+        else           fprintf(data_file, "(%.15E%.15Ej)", real, imag);
+        fprintf(data_file, "\n");
+    }
+
+    // Record last element of array without adding linebreak
+    real = creal(v[M-1]);
+    imag = cimag(v[M-1]);
+    if (imag >= 0) fprintf(data_file, "(%.15E+%.15Ej)", real, imag);
+    else           fprintf(data_file, "(%.15E%.15Ej)", real, imag);
+    fclose(data_file);
+}
+
+
+
+void carr_inline(FILE * f, int M, Carray v)
+{
+
+/** Given a opened file write complex array in current line of buffer **/
+
+    int
+        j;
+
+    double
+        real,
+        imag;
+
+    if (f == NULL)
+    {
+        printf("\n\n\nERROR: NULL file in carr_inline routine");
+        printf(" in module src/inout.c\n\n");
+        exit(EXIT_FAILURE);
+    }
+    for (j = 0; j < M; j ++)
+    {
+        real = creal(v[j]);
+        imag = cimag(v[j]);
+        if (imag >= 0) fprintf(f, "(%.15E+%.15Ej) ", real, imag);
+        else           fprintf(f, "(%.15E%.15Ej) ", real, imag);
+    }
+    fprintf(f, "\n");
+}
+
+
+
+void parLine(char fname [], int line, int * N, int * lmax, int * L,
+             double * v, double * g)
+{
+
+/** READ A LINE OF INPUT FILE TO SET THE PARAMETERS FOR 1 SPECIES **/
+
+    int
+        i;
+
+    FILE
+        * in_file;
+
+    in_file = openFileRead(fname);
+
+    // jump lines to get to requested 'line'
+    for (i = 0; i < line; i++) ReachNewLine(in_file);
+
+    // read parameters
+    fscanf(in_file,"%d",N);     // Number of particles
+    fscanf(in_file,"%d",lmax);  // max. individual ang. momentum
+    fscanf(in_file,"%d",L);     // total angular momentum constraint
+    fscanf(in_file,"%lf",v);    // frame velocity
+    fscanf(in_file,"%lf",g);    // contact interaction strength parameter
+
+    fclose(in_file);
+}
+
+
+
+void mixParLine(char fname [], int line, int * NA, int * lmaxA, int * NB,
+                int * lmaxB, int * L, double * v, double * mi, double g [])
+{
+
+/** READ A LINE OF INPUT FILE TO SET THE PARAMETERS FOR 2 SPECIES **/
+
+    int
+        i;
+
+    FILE
+        * in_file;
+
+    in_file = openFileRead(fname);
+
+    // jump lines to get to requested 'line'
+    for (i = 0; i < line; i++) ReachNewLine(in_file);
+
+    // read parameters
+    fscanf(in_file,"%d",NA);    // Num. of particles A (aways bosons)
+    fscanf(in_file,"%d",lmaxA); // max. individual ang. momemtum
+    fscanf(in_file,"%d",NB);    // Num. of particles B (bosons or fermions)
+    fscanf(in_file,"%d",lmaxB); // max. individual ang. momentum
+    fscanf(in_file,"%d",L);     // Total ang. momentum constraint
+    fscanf(in_file,"%lf",v);     // frame velocity
+    fscanf(in_file,"%lf",mi);    // mass imbalance
+    // CONTACT INTERACTION STRENGTH PARAMETERS
+    fscanf(in_file,"%lf",&g[0]);    // of particles A
+    fscanf(in_file,"%lf",&g[1]);    // of particles B (ignored for fermions)
+    fscanf(in_file,"%lf",&g[2]);    // interspecies interaction
+
+    fclose(in_file);
+}
+
+
+
+void parLine_time(char fname [], int line, int * N, int * lmax, int * L,
+                  double * v, double * g, int * Nsteps, double * dt)
+{
+
+/** READ A LINE OF INPUT FILE TO SET THE PARAMETERS FOR 1 SPECIES **/
+
+    int
+        i;
+
+    FILE
+        * in_file;
+
+    in_file = openFileRead(fname);
+
+    // jump lines to get to requested 'line'
+    for (i = 0; i < line; i++) ReachNewLine(in_file);
+
+    // read parameters
+    fscanf(in_file,"%d",N);     // Number of particles
+    fscanf(in_file,"%d",lmax);  // max. individual ang. momentum
+    fscanf(in_file,"%d",L);     // total angular momentum constraint
+    fscanf(in_file,"%lf",v);    // frame velocity
+    fscanf(in_file,"%lf",g);    // contact interaction strength parameter
+    fscanf(in_file,"%d",Nsteps);
+    fscanf(in_file,"%lf",dt);
+
+    fclose(in_file);
+}
+
+
+
+void mixParLine_time(char fname [], int line, int * NA, int * lmaxA,
+                     int * NB, int * lmaxB, int * L, double * v,
+                     double * mi, double g [], int * Nsteps, double * dt)
+{
+
+/** READ A LINE OF INPUT FILE TO SET THE PARAMETERS FOR 2 SPECIES **/
+
+    int
+        i;
+
+    FILE
+        * in_file;
+
+    in_file = openFileRead(fname);
+
+    // jump lines to get to requested 'line'
+    for (i = 0; i < line; i++) ReachNewLine(in_file);
+
+    // read parameters
+    fscanf(in_file,"%d",NA);    // Num. of particles A (aways bosons)
+    fscanf(in_file,"%d",lmaxA); // max. individual ang. momemtum
+    fscanf(in_file,"%d",NB);    // Num. of particles B (bosons or fermions)
+    fscanf(in_file,"%d",lmaxB); // max. individual ang. momentum
+    fscanf(in_file,"%d",L);     // Total ang. momentum constraint
+    fscanf(in_file,"%lf",v);     // frame velocity
+    fscanf(in_file,"%lf",mi);    // mass imbalance
+    // CONTACT INTERACTION STRENGTH PARAMETERS
+    fscanf(in_file,"%lf",&g[0]);    // of particles A
+    fscanf(in_file,"%lf",&g[1]);    // of particles B (ignored for fermions)
+    fscanf(in_file,"%lf",&g[2]);    // interspecies interaction
+    fscanf(in_file,"%d",Nsteps);
+    fscanf(in_file,"%lf",dt);
+
+    fclose(in_file);
 }
 
 

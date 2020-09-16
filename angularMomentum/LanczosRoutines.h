@@ -1257,6 +1257,119 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
 
 
 
+void LNCZS_HMAT_TIME(int nc, HConfMat H, Carray diag, Carray offdiag,
+                     Cmatrix lvec)
+{
+
+/** SHORT LANCZOS ITERATIONS FOR TIME PROPARATION
+    OUTPUT PARAMETERS :
+        lvec    - Lanczos vectors used to convert eigenvectors  of  the
+                  resulting tridiagonal system back to the original one
+        diag    - diagonal elements of tridiagonal symmetric matrix
+        offdiag - symmetric elements of tridiagonal matrix
+    RETURN :
+        number of itertion done (just 'lm' if none breakdown occurred)
+    OTHER PARAMETERS ARE REQUIRED TO APPLY HAMILTONIAN IN CONFIG. BASIS **/
+
+    int
+        i,
+        j,
+        k,
+        lm,
+        threadId,
+        nthreads;
+
+    double
+        tol,
+        maxCheck,
+        energy;
+
+    double complex
+        hc_update;
+
+    Carray
+        HC,
+        ortho;
+
+    lm = LNCZS_TIME_IT;
+
+    // Check for a source of breakdown in the algorithm to do not
+    // divide by zero. Instead of zero use  a  tolerance (tol) to
+    // avoid numerical instability
+    maxCheck = 0;
+    tol = 1E-15;
+
+    HC = carrDef(nc);
+    ortho = carrDef(lm);
+
+    // Initiate the method
+    matmul(nc,H->rows,H->cols,H->vals,lvec[0],HC);
+    diag[0] = carrDot(nc,lvec[0],HC);
+    for (j = 0; j < nc; j++) HC[j] = HC[j] - diag[0] * lvec[0][j];
+
+    // Core iteration procedure
+    for (i = 0; i < lm - 1; i++)
+    {
+        offdiag[i] = carrNorm(nc,HC);
+
+        if (maxCheck < creal(offdiag[i])) maxCheck = creal(offdiag[i]);
+
+        // If method break return number of iterations achieved
+        if (creal(offdiag[i]) / maxCheck < tol)
+        {
+            free(HC);
+            free(ortho);
+            printf("\n\nERROR : BREAKDOWN OCCURRED IN LANCZOS(MATRIX) ");
+            printf("METHOD FOR TIME INTEGRATION\n\n");
+            exit(EXIT_FAILURE);
+        }
+
+        for (j = 0; j < nc; j++) lvec[i+1][j] = HC[j] / offdiag[i];
+
+        // apply Hamiltonian in a vector from configurational basis
+        matmul(nc,H->rows,H->cols,H->vals,lvec[i+1],HC);
+
+        for (j = 0; j < nc; j++)
+        {
+            HC[j] = HC[j] - offdiag[i] * lvec[i][j];
+        }
+
+        diag[i + 1] = carrDot(nc,lvec[i + 1],HC);
+
+        for (j = 0; j < nc; j++)
+        {
+            HC[j] = HC[j] - diag[i+1]*lvec[i+1][j];
+        }
+
+        // Additional re-orthogonalization procedure. The main process
+        // is parallelized because depending on the number  of Lanczos
+        // iterations it may be the most demanding time,  beating even
+        // the time to apply the Hamiltonian
+        for (j = 0; j < i + 2; j++) ortho[j] = carrDot(nc, lvec[j], HC);
+
+        #pragma omp parallel private(j,k,threadId,nthreads,hc_update)
+        {
+            threadId = omp_get_thread_num();
+            nthreads = omp_get_num_threads();
+
+            for (j = threadId; j < nc; j += nthreads)
+            {
+                hc_update = HC[j];
+                for (k = 0; k < i + 2; k++)
+                {
+                    hc_update = hc_update - lvec[k][j] * ortho[k];
+                }
+                HC[j] = hc_update;
+            }
+        }
+    }
+
+    free(ortho);
+    free(HC);
+}
+
+
+
 void LNCZS_TIME(int nc, int lmax, Iarray * ht, Carray Ho, double g,
                Carray diag, Carray offdiag, Cmatrix lvec)
 {
@@ -1319,8 +1432,8 @@ void LNCZS_TIME(int nc, int lmax, Iarray * ht, Carray Ho, double g,
         {
             free(HC);
             free(ortho);
-            printf("\n\nERROR : BREAKDOWN OCCURRED IN LANCZOS METHOD ");
-            printf("FOR TIME INTEGRATION\n\n");
+            printf("\n\nERROR : BREAKDOWN OCCURRED IN LANCZOS(MATRIX) ");
+            printf("METHOD FOR TIME INTEGRATION\n\n");
             exit(EXIT_FAILURE);
         }
 
@@ -1370,7 +1483,7 @@ void LNCZS_TIME(int nc, int lmax, Iarray * ht, Carray Ho, double g,
 
 
 
-void LNCZS_BBMIX_TIME(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
+void LNCZS_BBMIX_TIME(CompoundSpace MixSpace, Carray HoA, Carray HoB,
                       double g [], Carray diag, Carray offdiag, Cmatrix lvec)
 {
 
@@ -1379,13 +1492,13 @@ void LNCZS_BBMIX_TIME(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
         j,
         k,
         nc,
+        lm,
         threadId,
         nthreads;
 
     double
         tol,
-        maxCheck,
-        energy;
+        maxCheck;
 
     double complex
         hc_update;
@@ -1393,6 +1506,8 @@ void LNCZS_BBMIX_TIME(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
     Carray
         HC,
         ortho;
+
+    lm = LNCZS_TIME_IT;
 
     // Check for a source of breakdown in the algorithm to do not
     // divide by zero. Instead of zero use  a  tolerance (tol) to
@@ -1407,7 +1522,6 @@ void LNCZS_BBMIX_TIME(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
     // Initiate the method
     mixture_actH(MixSpace,HoA,HoB,g,lvec[0],HC);
     diag[0] = carrDot(nc,lvec[0],HC);
-    energy = creal(diag[0]);
     for (j = 0; j < nc; j++) HC[j] = HC[j] - diag[0] * lvec[0][j];
 
     // Core iteration procedure
@@ -1430,6 +1544,110 @@ void LNCZS_BBMIX_TIME(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
         for (j = 0; j < nc; j++) lvec[i+1][j] = HC[j] / offdiag[i];
 
         mixture_actH(MixSpace,HoA,HoB,g,lvec[i+1],HC);
+
+        for (j = 0; j < nc; j++)
+        {
+            HC[j] = HC[j] - offdiag[i] * lvec[i][j];
+        }
+
+        diag[i + 1] = carrDot(nc,lvec[i + 1],HC);
+
+        for (j = 0; j < nc; j++)
+        {
+            HC[j] = HC[j] - diag[i+1]*lvec[i+1][j];
+        }
+
+        // Additional re-orthogonalization procedure. The main process
+        // is parallelized because depending on the number  of Lanczos
+        // iterations it may be the most demanding time,  beating even
+        // the time to apply the Hamiltonian
+        for (j = 0; j < i + 2; j++) ortho[j] = carrDot(nc,lvec[j],HC);
+
+        #pragma omp parallel private(j,k,threadId,nthreads,hc_update)
+        {
+            threadId = omp_get_thread_num();
+            nthreads = omp_get_num_threads();
+
+            for (j = threadId; j < nc; j += nthreads)
+            {
+                hc_update = HC[j];
+                for (k = 0; k < i + 2; k++)
+                {
+                    hc_update = hc_update - lvec[k][j] * ortho[k];
+                }
+                HC[j] = hc_update;
+            }
+        }
+    }
+
+    free(ortho);
+    free(HC);
+}
+
+
+
+void LNCZS_BFMIX_TIME(BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
+                      double g [], Carray diag, Carray offdiag, Cmatrix lvec)
+{
+
+    int
+        i,
+        j,
+        k,
+        nc,
+        lm,
+        threadId,
+        nthreads;
+
+    double
+        tol,
+        maxCheck,
+        energy;
+
+    double complex
+        hc_update;
+
+    Carray
+        HC,
+        ortho;
+
+    lm = LNCZS_TIME_IT; // DEFAULT NUMBER OF ITERATIONS
+
+    nc = MixSpace->size;
+    HC = carrDef(nc);
+    ortho = carrDef(lm);
+
+    // Check for a source of breakdown in the algorithm to do not
+    // divide by zero. Instead of zero use  a  tolerance (tol) to
+    // avoid numerical instability
+    maxCheck = 0;
+    tol = 1E-15;
+
+    // Initiate the method
+    bosefermi_actH(MixSpace,HoB,HoF,g,lvec[0],HC);
+    diag[0] = carrDot(nc,lvec[0],HC);
+    for (j = 0; j < nc; j++) HC[j] = HC[j] - diag[0] * lvec[0][j];
+
+    // Core iteration procedure
+    for (i = 0; i < lm - 1; i++)
+    {
+        offdiag[i] = carrNorm(nc,HC);
+
+        if (maxCheck < creal(offdiag[i])) maxCheck = creal(offdiag[i]);
+
+        // If method break return number of iterations achieved
+        if (creal(offdiag[i]) / maxCheck < tol)
+        {
+            free(HC);
+            free(ortho);
+            printf("\n\nWARNING : BREAKDOWN OCCURRED IN LANCZOS METHOD FOR ");
+            printf("TWO SPECIES BOSE-FERMI MIXTURE IN TIME EVOLUTION\n\n");
+            exit(EXIT_FAILURE);
+        }
+
+        for (j = 0; j < nc; j++) lvec[i+1][j] = HC[j] / offdiag[i];
+
+        bosefermi_actH(MixSpace,HoB,HoF,g,lvec[i+1],HC);
 
         for (j = 0; j < nc; j++)
         {
