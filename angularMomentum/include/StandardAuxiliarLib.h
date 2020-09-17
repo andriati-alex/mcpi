@@ -384,36 +384,6 @@ void ReachNewLine(FILE * f)
 
 
 
-void carrAppend(FILE * f, int M, Carray v)
-{
-
-/** Given a opened file write complex array in the succeeding lines **/
-
-    int
-        j;
-
-    double
-        real,
-        imag;
-
-    if (f == NULL)
-    {
-        printf("\n\nERROR: NULL file in carrAppend routine\n\n");
-        exit(EXIT_FAILURE);
-    }
-
-    for (j = 0; j < M; j ++)
-    {
-        real = creal(v[j]);
-        imag = cimag(v[j]);
-
-        if (imag >= 0) fprintf(f, "\n(%.15E+%.15Ej)",real,imag);
-        else           fprintf(f, "\n(%.15E%.15Ej)",real,imag);
-    }
-}
-
-
-
 void carr_txt(char fname [], int M, Carray v)
 {
 
@@ -455,25 +425,23 @@ void carr_inline(FILE * f, int M, Carray v)
 
     int
         j;
-
     double
         real,
         imag;
 
     if (f == NULL)
     {
-        printf("\n\n\nERROR: NULL file in carr_inline routine");
-        printf(" in module src/inout.c\n\n");
+        printf("\n\n\nERROR: NULL file in carr_inline routine\n\n");
         exit(EXIT_FAILURE);
     }
     for (j = 0; j < M; j ++)
     {
         real = creal(v[j]);
         imag = cimag(v[j]);
-        if (imag >= 0) fprintf(f, "(%.15E+%.15Ej) ", real, imag);
-        else           fprintf(f, "(%.15E%.15Ej) ", real, imag);
+        if (imag >= 0) fprintf(f,"(%.15E+%.15Ej) ",real,imag);
+        else           fprintf(f,"(%.15E%.15Ej) ",real,imag);
     }
-    fprintf(f, "\n");
+    fprintf(f,"\n");
 }
 
 

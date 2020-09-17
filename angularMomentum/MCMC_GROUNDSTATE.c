@@ -1,5 +1,5 @@
 #include <time.h>
-#include "TimePropagation.h"
+#include "GroundStateDrivers.h"
 
 /** MAIN PROGRAM TO COMPUTE GROUND STATE(S) FROM INPUT FILES (.inp)
 
@@ -39,10 +39,12 @@ int main(int argc, char * argv[])
         typeB;  // Can be either (b)osons or (f)ermions
 
     char
-        TimeInfo[20],
         spec_name[20],
         inp_fname[100],
-        fname_prefix[100];
+        fname_prefix[50];
+
+    unsigned int
+        full_output;
 
     int
         i,
@@ -51,8 +53,7 @@ int main(int argc, char * argv[])
         nthreads;
 
     double
-        time_used,
-        record_interval;
+        time_used;
 
     FILE
         * job_file;
@@ -67,11 +68,12 @@ int main(int argc, char * argv[])
 
     /* CONFIGURE TYPE OF SYSTEM
     ==================================================================== */
-    job_file = openFileRead("time-job.conf");
+    job_file = openFileRead("groundstate-job.conf");
+    full_output = 0;
     i = 1;
     while ((c = getc(job_file)) != EOF)
     {
-        // jump comment line. They are start with #
+        // jump comment line which are initiated by #
         if (c == '#') { ReachNewLine(job_file); continue; }
         else          { fseek(job_file,-1,SEEK_CUR);    }
 
@@ -86,11 +88,8 @@ int main(int argc, char * argv[])
                 i = i + 1;
                 break;
             case 3:
-                fscanf(job_file,"%lf",&record_interval);
+                fscanf(job_file,"%d",&full_output);
                 i = i + 1;
-                break;
-            case 4:
-                fscanf(job_file,"%s",TimeInfo);
                 break;
         }
         ReachNewLine(job_file);
@@ -100,7 +99,7 @@ int main(int argc, char * argv[])
     =================================================================== */
 
     // Assess input parameter
-    if (i != 4)
+    if (i < 4)
     {
         printf("\n\nINPUT ERROR : not enough input lines in job.conf\n\n");
         exit(EXIT_FAILURE);
@@ -120,7 +119,7 @@ int main(int argc, char * argv[])
     printf("\t******************************************************\n");
     printf("\t*                                                    *\n");
     printf("\t*     FIXED MOMENTUM MULTICONFIGURATIONAL METHOD     *\n");
-    printf("\t*                  TIME PROPAGATION                  *\n");
+    printf("\t*            FOR GROUND STATE COMPUTATION            *\n");
     printf("\t*                                                    *\n");
     printf("\t******************************************************\n");
 
@@ -130,7 +129,7 @@ int main(int argc, char * argv[])
     {
         if (typeB == 'f') strcpy(spec_name,"fermions");
         else              strcpy(spec_name,"bosons");
-        printf("\n\tMixture : bosons + %s",spec_name);
+        printf("\n\tMixture of bosons and %s",spec_name);
     }
     printf("\n\tFrom input file %s %d jobs are requested",inp_fname,Njobs);
 
@@ -139,18 +138,16 @@ int main(int argc, char * argv[])
     switch (Nspec)
     {
         case 1:
-            TIME_SCANNING(Njobs,fname_prefix,record_interval,TimeInfo[0]);
+            SCANNING(Njobs,fname_prefix,full_output);
             break;
         case 2:
             if (typeB == 'F' || typeB == 'f')
             {
-                TIME_BOSEFERMI_SCANNING(Njobs,fname_prefix,
-                    record_interval,TimeInfo[0]);
+                BOSEFERMI_SCANNING(Njobs,fname_prefix,full_output);
             }
             else
             {
-                TIME_MIXTURE_SCANNING(Njobs,fname_prefix,
-                    record_interval,TimeInfo[0]);
+                MIXTURE_SCANNING(Njobs,fname_prefix,full_output);
             }
             break;
     }
