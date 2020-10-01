@@ -367,6 +367,30 @@ FILE * openFileRead(char fname [])
 
 
 
+unsigned int NumberOfLines(char fname [])
+{
+
+    int
+        i;
+
+    char
+        c;
+
+    FILE
+        * arq;
+
+    i = 0;
+    arq = openFileRead(fname);
+    while ((c = getc(arq)) != EOF)
+    {
+        if (c == '\n') i++;
+    }
+    fclose(arq);
+    return i;
+}
+
+
+
 void ReachNewLine(FILE * f)
 {
 
@@ -399,7 +423,7 @@ void carr_txt(char fname [], int M, Carray v)
 
     data_file = openFileWrite(fname);
 
-    for (j = 0; j < M - 1; j ++)
+    for (j = 0; j < M; j ++)
     {
         real = creal(v[j]);
         imag = cimag(v[j]);
@@ -407,12 +431,35 @@ void carr_txt(char fname [], int M, Carray v)
         else           fprintf(data_file, "(%.15E%.15Ej)", real, imag);
         fprintf(data_file, "\n");
     }
+}
 
-    // Record last element of array without adding linebreak
-    real = creal(v[M-1]);
-    imag = cimag(v[M-1]);
-    if (imag >= 0) fprintf(data_file, "(%.15E+%.15Ej)", real, imag);
-    else           fprintf(data_file, "(%.15E%.15Ej)", real, imag);
+
+
+void carr_input_txt(char fname [], int M, Carray v)
+{
+    int
+        i,
+        j;
+    double
+        real,
+        imag;
+    FILE
+        * data_file;
+
+    j = NumberOfLines(fname);
+    if (j != M)
+    {
+        printf("\n\n\nINPUT ERROR : The number of lines in the input ");
+        printf("file %s(%d lines) is not the required of ",fname,j);
+        printf("%d lines\n\n\n",M);
+        exit(EXIT_FAILURE);
+    }
+    data_file = openFileRead(fname);
+    for (j = 0; j < M; j++)
+    {
+        i = fscanf(data_file,"(%lf%lfj)\n",&real,&imag);
+        v[j] = real + I * imag;
+    }
     fclose(data_file);
 }
 
@@ -575,31 +622,6 @@ void mixParLine_time(char fname [], int line, int * NA, int * lmaxA,
     fscanf(in_file,"%lf",dt);
 
     fclose(in_file);
-}
-
-
-
-unsigned int NumberOfLines(char fname [])
-{
-
-    int
-        i;
-
-    char
-        c;
-
-    FILE
-        * arq;
-
-    i = 0;
-    arq = openFileRead(fname);
-    // jump comment line which are initiated by #
-    while ((c = getc(arq)) != EOF)
-    {
-        if (c == '\n') i++;
-    }
-    fclose(arq);
-    return i;
 }
 
 

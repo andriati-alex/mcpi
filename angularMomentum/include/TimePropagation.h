@@ -54,17 +54,17 @@ double TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
     if (Tinfo == 'i' || Tinfo == 'I') dt = Tstep;
     else                              dt = I*Tstep;
 
+    // Configurational basis setup
+    nc = BFixedMom_mcsize(Npar,lmax,total_mom);
+    ht = BAssembleHT(Npar,lmax,total_mom,nc);
+    H = boseH(Npar,lmax,nc,ht,Ho,g);
+
     if (Tinfo == 'r' || Tinfo == 'R')
     {
         fprintf(dataf,"(0.0+0.0) ");
         carr_inline(dataf,nc,C);
     }
     Nrec = 1;
-
-    // Configurational basis setup
-    nc = BFixedMom_mcsize(Npar,lmax,total_mom);
-    ht = BAssembleHT(Npar,lmax,total_mom,nc);
-    H = boseH(Npar,lmax,nc,ht,Ho,g);
 
     if (H == NULL) printf("\nWithout set Many-Body Hamiltonian matrix\n");
     else           printf("\nUsing (sparse) Hamiltonian matrix\n");
@@ -186,7 +186,7 @@ double TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         else
         {
             // record data if complete another record period
-            if ((step+1)*Tstep/Trec >= Nrec)
+            if (fabs((step+1)*Tstep/Trec - Nrec) >= 1E-10)
             {
                 fprintf(dataf,"(%.5lf+0.0) ",(step+1)*Tstep);
                 carr_inline(dataf,nc,C);
@@ -384,7 +384,7 @@ double BB_TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         else
         {
             // record data if complete another record period
-            if ((step+1)*Tstep/Trec >= Nrec)
+            if (fabs((step+1)*Tstep/Trec - Nrec) >= 1E-10)
             {
                 fprintf(dataf,"(%.5lf+0.0) ",(step+1)*Tstep);
                 carr_inline(dataf,nc,C);
@@ -578,7 +578,7 @@ double BF_TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         else
         {
             // record data if complete another record period
-            if ((step+1)*Tstep/Trec >= Nrec)
+            if (fabs((step+1)*Tstep/Trec - Nrec) >= 1E-10)
             {
                 fprintf(dataf,"(%.5lf+0.0) ",(step+1)*Tstep);
                 carr_inline(dataf,nc,C);
@@ -626,7 +626,8 @@ void TIME_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
         strnum[10],
         e_fname[100],
         in_fname[100],
-        out_fname[100];
+        out_fname[100],
+        init_fname[100];
 
     Carray
         C,
@@ -652,25 +653,12 @@ void TIME_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
     {
         // number of line as string to append in output file name
         sprintf(strnum,"%d",i+1);
-        if (Tinfo == 'r' || Tinfo == 'R')
-        {
-            // set output file name
-            strcpy(out_fname,"output/");
-            strcat(out_fname,prefix);
-            strcat(out_fname,"_coef_job");
-            strcat(out_fname,strnum);
-            strcat(out_fname,".dat");
-            // open output file for coefficients of Fock states
-            c_file = openFileWrite(out_fname);
-        }
         // set up parameters of configurational
         // space in line 'i' of input file
         parLine_time(in_fname,i,&Npar,&lmax,&total_mom,&boost,&g,
                      &Nsteps,&Tstep);
         // number of configuration(nc) - config. space dimension
         nc = BFixedMom_mcsize(Npar,lmax,total_mom);
-        printf("\n\n\n\n\nCOMPUTING TIME EVOLUTION %d/%d",i+1,n_cases);
-        sepline();
         // set up one-body matrix elements
         Ho = carrDef(2*lmax+1);
         for (j = 0; j < 2*lmax+1; j++)
@@ -680,7 +668,32 @@ void TIME_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
         }
         // initialize many-body state coefficients
         C = carrDef(nc);
-        initGuess(nc,C);
+        if (Tinfo == 'r' || Tinfo == 'R')
+        {
+            // set file name with input data
+            strcpy(init_fname,"inp_data/");
+            strcat(init_fname,prefix);
+            strcat(init_fname,"_job");
+            strcat(init_fname,strnum);
+            strcat(init_fname,".dat");
+            // read the input data
+            carr_input_txt(init_fname,nc,C);
+            // set output file name
+            strcpy(out_fname,"output/");
+            strcat(out_fname,prefix);
+            strcat(out_fname,"_time_job");
+            strcat(out_fname,strnum);
+            strcat(out_fname,".dat");
+            // open output file for coefficients of Fock space expansion
+            c_file = openFileWrite(out_fname);
+        }
+        else
+        {
+            initGuess(nc,C);
+            c_file = NULL;
+        }
+        printf("\n\n\n\n\nCOMPUTING TIME EVOLUTION %d/%d",i+1,n_cases);
+        sepline();
         // call (main)routine to compute the ground state
         E0 = TIME_EVOLUTION(Nsteps,Tstep,Tinfo,Trec,c_file,
                             Npar,lmax,total_mom,C,Ho,g);
@@ -695,10 +708,10 @@ void TIME_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
             strcat(out_fname,"_job");
             strcat(out_fname,strnum);
             strcat(out_fname,".dat");
-            // open output file
+            // record output ground-state from imaginary time
             carr_txt(out_fname,nc,C);
         }
-        else fclose(c_file);
+        if (c_file != NULL) fclose(c_file);
         free(C);
         free(Ho);
     }
@@ -735,7 +748,8 @@ void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
         strnum[10],
         e_fname[100],
         in_fname[100],
-        out_fname[100];
+        out_fname[100],
+        init_fname[100];
 
     Carray
         C,
@@ -766,24 +780,11 @@ void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
     {
         // number of line as string to append in output file name
         sprintf(strnum,"%d",i+1);
-        if (Tinfo == 'r' || Tinfo == 'R')
-        {
-            // set output file name
-            strcpy(out_fname,"output/");
-            strcat(out_fname,prefix);
-            strcat(out_fname,"_coef_job");
-            strcat(out_fname,strnum);
-            strcat(out_fname,".dat");
-            // open output file for coefficients of Fock states
-            c_file = openFileWrite(out_fname);
-        }
         // set up parameters of config. space from line 'i' of input file
         mixParLine_time(in_fname,i,&NparA,&lmaxA,&NparB,&lmaxB,&total_mom,
                 &boost,&MassImbal,g,&Nsteps,&Tstep);
         MixSpace = AllocCompBasis(NparA,NparB,lmaxA,lmaxB,total_mom);
         nc = MixSpace->size;
-        printf("\n\n\n\n\nCOMPUTING GROUND STATE(MIXTURE) %d/%d",i+1,n_cases);
-        sepline();
         // set up one-body matrix elements
         HoA = carrDef(2*lmaxA+1);
         for (j = 0; j < 2*lmaxA+1; j++)
@@ -797,9 +798,34 @@ void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
             l = (j-lmaxB) - boost/MassImbal;
             HoB[j] = 0.5*MassImbal*l*l;
         }
-        // initialize many-body state coefficients
+        // Allocate many-body state coefficients
         C = carrDef(nc);
-        initGuess(nc,C);
+        if (Tinfo == 'r' || Tinfo == 'R')
+        {
+            // set file name with input data
+            strcpy(init_fname,"inp_data/");
+            strcat(init_fname,prefix);
+            strcat(init_fname,"_job");
+            strcat(init_fname,strnum);
+            strcat(init_fname,".dat");
+            // read the input data
+            carr_input_txt(init_fname,nc,C);
+            // set output file name
+            strcpy(out_fname,"output/");
+            strcat(out_fname,prefix);
+            strcat(out_fname,"_time_job");
+            strcat(out_fname,strnum);
+            strcat(out_fname,".dat");
+            // open output file for coefficients of Fock space expansion
+            c_file = openFileWrite(out_fname);
+        }
+        else
+        {
+            initGuess(nc,C);
+            c_file = NULL;
+        }
+        printf("\n\n\n\n\nCOMPUTING GROUND STATE(MIXTURE) %d/%d",i+1,n_cases);
+        sepline();
         // call routine for the ground state
         E0 = BB_TIME_EVOLUTION(Nsteps,Tstep,Tinfo,Trec,c_file,
              MixSpace,C,HoA,HoB,g);
@@ -820,7 +846,7 @@ void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
             // open output file
             carr_txt(out_fname,nc,C);
         }
-        else fclose(c_file);
+        if (c_file != NULL) fclose(c_file);
         free(C);
         free(HoA);
         free(HoB);
@@ -860,7 +886,8 @@ void TIME_BOSEFERMI_SCANNING(int n_cases, char prefix [],
         strnum[10],
         e_fname[100],
         in_fname[100],
-        out_fname[100];
+        out_fname[100],
+        init_fname[100];
 
     Carray
         C,
@@ -891,25 +918,11 @@ void TIME_BOSEFERMI_SCANNING(int n_cases, char prefix [],
     {
         // number of line as string to append in output file name
         sprintf(strnum,"%d",i+1);
-        if (Tinfo == 'r' || Tinfo == 'R')
-        {
-            // set output file name
-            strcpy(out_fname,"output/");
-            strcat(out_fname,prefix);
-            strcat(out_fname,"_coef_job");
-            strcat(out_fname,strnum);
-            strcat(out_fname,".dat");
-            // open output file for coefficients of Fock states
-            c_file = openFileWrite(out_fname);
-        }
         // set up parameters of config. space from line 'i' of input file
         mixParLine_time(in_fname,i,&NparB,&lmaxB,&NparF,&lmaxF,&total_mom,
                 &boost,&MassImbal,g,&Nsteps,&Tstep);
         MixSpace = BoseFermiBasis(NparB,NparF,lmaxB,lmaxF,total_mom);
         nc = MixSpace->size;
-        printf("\n\n\n\n\nCOMPUTING TIME EVOLUTION OF ");
-        printf("BOSE-FERMI MIXTURE %d/%d",i+1,n_cases);
-        sepline();
         // set up one-body matrix elements
         HoB = carrDef(2*lmaxB+1);
         for (j = 0; j < 2*lmaxB+1; j++)
@@ -925,7 +938,33 @@ void TIME_BOSEFERMI_SCANNING(int n_cases, char prefix [],
         }
         // initialize many-body state coefficients
         C = carrDef(nc);
-        initGuess(nc,C);
+        if (Tinfo == 'r' || Tinfo == 'R')
+        {
+            // set file name with input data
+            strcpy(init_fname,"inp_data/");
+            strcat(init_fname,prefix);
+            strcat(init_fname,"_job");
+            strcat(init_fname,strnum);
+            strcat(init_fname,".dat");
+            // read the input data
+            carr_input_txt(init_fname,nc,C);
+            // set output file name
+            strcpy(out_fname,"output/");
+            strcat(out_fname,prefix);
+            strcat(out_fname,"_coef_job");
+            strcat(out_fname,strnum);
+            strcat(out_fname,".dat");
+            // open output file for coefficients of Fock states
+            c_file = openFileWrite(out_fname);
+        }
+        else
+        {
+            initGuess(nc,C);
+            c_file = NULL;
+        }
+        printf("\n\n\n\n\nCOMPUTING TIME EVOLUTION OF ");
+        printf("BOSE-FERMI MIXTURE %d/%d",i+1,n_cases);
+        sepline();
         // call routine for the ground state
         E0 = BF_TIME_EVOLUTION(Nsteps,Tstep,Tinfo,Trec,c_file,
              MixSpace,C,HoB,HoF,g);
@@ -946,7 +985,7 @@ void TIME_BOSEFERMI_SCANNING(int n_cases, char prefix [],
             // open output file
             carr_txt(out_fname,nc,C);
         }
-        else fclose(c_file);
+        if (c_file != NULL) fclose(c_file);
         free(C);
         free(HoB);
         free(HoF);
