@@ -291,6 +291,18 @@ void rarrNormalize(unsigned int n, Rarray x)
 
 
 
+void assert_norm(unsigned int n, Carray C)
+{
+    if (fabs(carrNorm(n,C) - 1) > NORM_ERR_TOL)
+    {
+        printf("\n\nCOMPUTING ERROR: The many-body state exceeded the ");
+        printf("norm error tolerance. ||.|| = %.14lf\n\n",carrNorm(n,C));
+        exit(EXIT_FAILURE);
+    }
+}
+
+
+
 int assert_BoseNocc(int Norbs, int Npar, Iarray occ)
 {
 
@@ -372,18 +384,18 @@ unsigned int NumberOfLines(char fname [])
 
     int
         i;
-
     char
         c;
-
     FILE
         * arq;
 
     i = 0;
     arq = openFileRead(fname);
-    while ((c = getc(arq)) != EOF)
+    c = getc(arq);
+    while (c != EOF)
     {
         if (c == '\n') i++;
+        c = getc(arq);
     }
     fclose(arq);
     return i;
@@ -408,6 +420,20 @@ void ReachNewLine(FILE * f)
 
 
 
+void rarr_txt(char fname [], int M, Rarray x)
+{
+    int
+        j;
+    FILE
+        * data_file;
+
+    data_file = openFileWrite(fname);
+    for (j = 0; j < M; j++) fprintf(data_file,"%.14E\n",x[j]);
+    fclose(data_file);
+}
+
+
+
 void carr_txt(char fname [], int M, Carray v)
 {
 
@@ -427,10 +453,11 @@ void carr_txt(char fname [], int M, Carray v)
     {
         real = creal(v[j]);
         imag = cimag(v[j]);
-        if (imag >= 0) fprintf(data_file, "(%.15E+%.15Ej)", real, imag);
-        else           fprintf(data_file, "(%.15E%.15Ej)", real, imag);
-        fprintf(data_file, "\n");
+        if (imag >= 0) fprintf(data_file,"(%.15E+%.15Ej)",real,imag);
+        else           fprintf(data_file,"(%.15E%.15Ej)",real,imag);
+        fprintf(data_file,"\n");
     }
+    fclose(data_file);
 }
 
 
@@ -819,6 +846,69 @@ void QRdecomp(unsigned int dim, Rmatrix A, Rmatrix Q)
     // Free memory
     rmatFree(dim,aux);
     rmatFree(dim,Qstep);
+}
+
+
+
+Rarray setGrid()
+{
+
+/** SET THE GRID POINTS IN A VECTOR AND RETURN IT **/
+
+    int
+        i;
+    double
+        dx,
+        x0;
+    Rarray
+        x;
+    dx = 2*PI/(NGRID_POINTS-1);
+    x0 = -PI;
+    x = rarrDef(NGRID_POINTS);
+    for (i = 0; i < NGRID_POINTS; i++) x[i] = x0+i*dx;
+    return x;
+}
+
+
+
+Rarray setGridPos()
+{
+
+/** SET THE GRID POINTS IN A VECTOR AND RETURN IT **/
+
+    int
+        i;
+    double
+        dx,
+        x0;
+    Rarray
+        x;
+    dx = 2*PI/(NGRID_POINTS-1);
+    x0 = 0;
+    x = rarrDef(NGRID_POINTS);
+    for (i = 0; i < NGRID_POINTS; i++) x[i] = x0+i*dx;
+    return x;
+}
+
+
+
+Rarray setDoubleGrid()
+{
+
+/** SET THE GRID POINTS IN A VECTOR AND RETURN IT **/
+
+    int
+        i;
+    double
+        dx,
+        x0;
+    Rarray
+        x;
+    dx = 4*PI/(2*NGRID_POINTS);
+    x0 = -2*PI;
+    x = rarrDef(2*NGRID_POINTS+1);
+    for (i = 0; i < 2*NGRID_POINTS+1; i++) x[i] = x0+i*dx;
+    return x;
 }
 
 

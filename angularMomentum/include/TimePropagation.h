@@ -2,10 +2,11 @@
 #define _TimePropagation_h
 
 #include "LanczosRoutines.h"
+#include "MomentumObservables.h"
 
 double TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
-                      FILE * dataf, int Npar, int lmax, int total_mom,
-                      Carray C, Carray Ho, double g)
+       char prefix [], int jobId, int Npar, int lmax, int total_mom,
+       Carray C, Carray Ho, double g)
 {
 
 /** SHORT ITERATIVE LANCZOS(SIL) INTEGRATOR IN IMAGINARY TIME
@@ -17,54 +18,83 @@ double TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         i,
         k,
         j,
+        m,
         nc,
         step,
         Nrec,
         Niter;
-
     double
         GSenergy,
         previousE;
-
     double complex
         dt;
-
     Iarray
         * ht;
-
     Rarray
         d,
         e,
-        eigvec;
-
+        eigvec,
+        avgocc;
     Carray
         aux,
         diag,
         offdiag,
         Clanczos;
-
     Cmatrix
         lvec;
-
     HConfMat
         H;
+    char
+        fname[100],
+        jobIdstr[5];
+    FILE
+        * dataf,
+        * timef;
 
     Niter = LNCZS_TIME_IT;
-
-    if (Tinfo == 'i' || Tinfo == 'I') dt = Tstep;
-    else                              dt = I*Tstep;
 
     // Configurational basis setup
     nc = BFixedMom_mcsize(Npar,lmax,total_mom);
     ht = BAssembleHT(Npar,lmax,total_mom,nc);
     H = boseH(Npar,lmax,nc,ht,Ho,g);
 
-    if (Tinfo == 'r' || Tinfo == 'R')
+    avgocc = rarrDef(2*lmax+1);
+
+    sprintf(jobIdstr,"%d",jobId);
+
+    strcpy(fname,OUTPUT_PATH);
+    strcat(fname,prefix);
+    strcat(fname,"_timecoef_job");
+    strcat(fname,jobIdstr);
+    strcat(fname,".dat");
+    // open output file for coefficients of Fock space expansion
+    dataf = openFileWrite(fname);
+
+    strcpy(fname,OUTPUT_PATH);
+    strcat(fname,prefix);
+    strcat(fname,"_timeobs_job");
+    strcat(fname,jobIdstr);
+    strcat(fname,".dat");
+    // open output file for average occuaptions and time instants
+    timef = openFileWrite(fname);
+
+    // record initial data
+    carr_inline(dataf,nc,C);
+
+    // record time instants and average occupations
+    fprintf(timef,"# time  |  Vector of average occupations\n");
+    single_avgocc(Npar,lmax,nc,ht,C,avgocc);
+    fprintf(timef,"%8.5lf",0.0);
+    for (m = 0; m < 2*lmax+1; m++)
     {
-        fprintf(dataf,"(0.0+0.0) ");
-        carr_inline(dataf,nc,C);
+        fprintf(timef," %13.10lf",avgocc[m]);
     }
+    fprintf(timef,"\n");
+
     Nrec = 1;
+
+    if (Tinfo == 'i' || Tinfo == 'I') dt = Tstep;
+    else                              dt = I*Tstep;
 
     if (H == NULL) printf("\nWithout set Many-Body Hamiltonian matrix\n");
     else           printf("\nUsing (sparse) Hamiltonian matrix\n");
@@ -86,8 +116,6 @@ double TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
     lvec = cmatDef(Niter,nc);
     aux = carrDef(Niter);
     Clanczos = carrDef(Niter);
-
-
 
     // Compute initial energy (GUESS)
     if (H == NULL) actH(lmax,nc,ht,Ho,g,C,lvec[0]);
@@ -122,7 +150,7 @@ double TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         {   // Solve in diagonal basis and for this apply eigvec trasformation
             aux[k] = eigvec[0*Niter + k] * Clanczos[0];
             // aux[k] = aux[k] * cexp(- I * d[k] * dt); // REAL TIME CASE
-            aux[k] = aux[k] * exp(- d[k] * dt);
+            aux[k] = aux[k] * cexp(- d[k] * dt);
         }
 
         for (k = 0; k < Niter; k++)
@@ -162,6 +190,9 @@ double TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
                 if (1.0 - GSenergy/previousE < 1E-9)
                 {
                     // ACHIEVED CONVERGENCE CRITERIA
+                    fclose(dataf);
+                    fclose(timef);
+                    free(avgocc);
                     free(d);
                     free(e);
                     free(eigvec);
@@ -183,20 +214,26 @@ double TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
                 else previousE = GSenergy;
             }
         }
-        else
+        // record data if complete another record period
+        if (fabs((step+1)*Tstep/Trec - Nrec) <= 1E-10)
         {
-            // record data if complete another record period
-            if (fabs((step+1)*Tstep/Trec - Nrec) >= 1E-10)
+            single_avgocc(Npar,lmax,nc,ht,C,avgocc);
+            fprintf(timef,"%8.5lf",(step+1)*Tstep);
+            for (m = 0; m < 2*lmax+1; m++)
             {
-                fprintf(dataf,"(%.5lf+0.0) ",(step+1)*Tstep);
-                carr_inline(dataf,nc,C);
-                Nrec++;
+                fprintf(timef," %13.10lf",avgocc[m]);
             }
+            fprintf(timef,"\n");
+            carr_inline(dataf,nc,C);
+            Nrec++;
         }
     }
 
 
 
+    fclose(dataf);
+    fclose(timef);
+    free(avgocc);
     free(d);
     free(e);
     free(eigvec);
@@ -217,7 +254,7 @@ double TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
 
 
 double BB_TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
-       FILE * dataf, CompoundSpace S, Carray C, Carray HoA,
+       char prefix [], int jobId, CompoundSpace S, Carray C, Carray HoA,
        Carray HoB, double g [])
 {
 
@@ -225,49 +262,99 @@ double BB_TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         i,
         k,
         j,
+        m,
         nc,
         Npar,
         step,
         Nrec,
         Niter;
-
     double
+        avgLA,
+        avgLB,
+        variA,
+        variB,
+        covAB,
         GSenergy,
         previousE;
-
     double complex
         dt;
-
     Rarray
         d,
         e,
-        eigvec;
-
+        eigvec,
+        avgoccA,
+        avgoccB;
     Carray
         aux,
         diag,
         offdiag,
         Clanczos;
-
     Cmatrix
         lvec;
-
     HConfMat
         H;
+    char
+        fname[100],
+        jobIdstr[5];
+    FILE
+        * timef,
+        * dataf;
 
     Niter = LNCZS_TIME_IT;
     nc = S->size;
     Npar = S->Na + S->Nb;
 
+    avgoccA = rarrDef(2*S->lmaxA+1);
+    avgoccB = rarrDef(2*S->lmaxB+1);
+
+    sprintf(jobIdstr,"%d",jobId);
+
+    strcpy(fname,OUTPUT_PATH);
+    strcat(fname,prefix);
+    strcat(fname,"_timecoef_job");
+    strcat(fname,jobIdstr);
+    strcat(fname,".dat");
+    // open output file for coefficients of Fock space expansion
+    dataf = openFileWrite(fname);
+
+    strcpy(fname,OUTPUT_PATH);
+    strcat(fname,prefix);
+    strcat(fname,"_timeobs_job");
+    strcat(fname,jobIdstr);
+    strcat(fname,".dat");
+    // open output file for some observables and time instants
+    timef = openFileWrite(fname);
+
+    // record initial data
+    carr_inline(dataf,nc,C);
+
+    // record some observables related to angular momentum
+    mixture_avgocc(S,C,'A',avgoccA);
+    mixture_avgocc(S,C,'B',avgoccB);
+    avgLA = mixture_avgmom(S,C,'A');
+    avgLB = mixture_avgmom(S,C,'B');
+    variA = mixture_momvariance(S,C,'A');
+    variB = mixture_momvariance(S,C,'B');
+    covAB = mixture_momcov(S,C);
+    fprintf(timef,"# time | avg La | avg Lb | var La | var Lb | cov LaLb | ");
+    fprintf(timef,"vector of occ A | vector of occ B\n");
+    fprintf(timef,"%8.5lf %13.10lf %13.10lf ",0.0,avgLA,avgLB);
+    fprintf(timef,"%13.10lf %13.10lf %13.10lf",variA,variB,covAB);
+    for (m = 0; m < 2*S->lmaxA+1; m++)
+    {
+        fprintf(timef," %13.10lf",avgoccA[m]);
+    }
+    for (m = 0; m < 2*S->lmaxB+1; m++)
+    {
+        fprintf(timef," %13.10lf",avgoccB[m]);
+    }
+    fprintf(timef,"\n");
+
+    Nrec = 1;
+
+    // select type of time propagation
     if (Tinfo == 'i' || Tinfo == 'I') dt = Tstep;
     else                              dt = I*Tstep;
-
-    if (Tinfo == 'r' || Tinfo == 'R')
-    {
-        fprintf(dataf,"(0.0+0.0) ");
-        carr_inline(dataf,nc,C);
-    }
-    Nrec = 1;
 
     // TRY TO ALLOCATE MATRIX. IF THE MEMORY REQUIRED EXCEED
     // THE TOLERANCE DEFINED RETURN NULL POINTER
@@ -326,7 +413,7 @@ double BB_TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         {   // Solve in diagonal basis and for this apply eigvec trasformation
             aux[k] = eigvec[0*Niter + k] * Clanczos[0];
             // aux[k] = aux[k] * cexp(- I * d[k] * dt); // REAL TIME CASE
-            aux[k] = aux[k] * exp(- d[k] * dt);
+            aux[k] = aux[k] * cexp(- d[k] * dt);
         }
         for (k = 0; k < Niter; k++)
         {   // Backward transformation from diagonal representation
@@ -364,6 +451,10 @@ double BB_TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
                 if (1.0 - GSenergy/previousE < 1E-9)
                 {
                     // ACHIEVED CONVERGENCE CRITERIA
+                    fclose(dataf);
+                    fclose(timef);
+                    free(avgoccA);
+                    free(avgoccB);
                     free(d);
                     free(e);
                     free(eigvec);
@@ -381,18 +472,39 @@ double BB_TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
                 else previousE = GSenergy;
             }
         }
-        else
+
+        // record data if complete another record period
+        if (fabs((step+1)*Tstep/Trec - Nrec) <= 1E-10)
         {
-            // record data if complete another record period
-            if (fabs((step+1)*Tstep/Trec - Nrec) >= 1E-10)
+            mixture_avgocc(S,C,'A',avgoccA);
+            mixture_avgocc(S,C,'B',avgoccB);
+            avgLA = mixture_avgmom(S,C,'A');
+            avgLB = mixture_avgmom(S,C,'B');
+            variA = mixture_momvariance(S,C,'A');
+            variB = mixture_momvariance(S,C,'B');
+            covAB = mixture_momcov(S,C);
+
+            fprintf(timef,"%8.5lf ",(step+1)*Tstep);
+            fprintf(timef,"%13.10lf %13.10lf ",avgLA,avgLB);
+            fprintf(timef,"%13.10lf %13.10lf %13.10lf",variA,variB,covAB);
+            for (m = 0; m < 2*S->lmaxA+1; m++)
             {
-                fprintf(dataf,"(%.5lf+0.0) ",(step+1)*Tstep);
-                carr_inline(dataf,nc,C);
-                Nrec++;
+                fprintf(timef," %13.10lf",avgoccA[m]);
             }
+            for (m = 0; m < 2*S->lmaxB+1; m++)
+            {
+                fprintf(timef," %13.10lf",avgoccB[m]);
+            }
+            fprintf(timef,"\n");
+            carr_inline(dataf,nc,C);
+            Nrec++;
         }
     }
 
+    fclose(dataf);
+    fclose(timef);
+    free(avgoccA);
+    free(avgoccB);
     free(d);
     free(e);
     free(eigvec);
@@ -520,7 +632,7 @@ double BF_TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         {   // Solve in diagonal basis and for this apply eigvec trasformation
             aux[k] = eigvec[0*Niter + k] * Clanczos[0];
             // aux[k] = aux[k] * cexp(- I * d[k] * dt); // REAL TIME CASE
-            aux[k] = aux[k] * exp(- d[k] * dt);
+            aux[k] = aux[k] * cexp(- d[k] * dt);
         }
         for (k = 0; k < Niter; k++)
         {   // Backward transformation from diagonal representation
@@ -578,7 +690,7 @@ double BF_TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         else
         {
             // record data if complete another record period
-            if (fabs((step+1)*Tstep/Trec - Nrec) >= 1E-10)
+            if (fabs((step+1)*Tstep/Trec - Nrec) <= 1E-10)
             {
                 fprintf(dataf,"(%.5lf+0.0) ",(step+1)*Tstep);
                 carr_inline(dataf,nc,C);
@@ -614,28 +726,23 @@ void TIME_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
         lmax,
         Nsteps,
         total_mom;
-
     double
         l,
         g,
         E0,
         Tstep,
         boost;
-
     char
         strnum[10],
         e_fname[100],
         in_fname[100],
         out_fname[100],
         init_fname[100];
-
     Carray
         C,
         Ho;
-
     FILE
-        * e_file,
-        * c_file;
+        * e_file;
 
     // set up name of file containing input data
     strcpy(in_fname,prefix);
@@ -644,7 +751,7 @@ void TIME_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
     // set up name of file containing energy
     strcpy(e_fname,"output/");
     strcat(e_fname,prefix);
-    strcat(e_fname,"_energy.dat");
+    strcat(e_fname,"_timesetup.dat");
     e_file = openFileWrite(e_fname);
     fprintf(e_file,"# Energy per particle | Num. of Particles | lmax ");
     fprintf(e_file,"| total mom. | boost | g");
@@ -678,24 +785,15 @@ void TIME_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
             strcat(init_fname,".dat");
             // read the input data
             carr_input_txt(init_fname,nc,C);
-            // set output file name
-            strcpy(out_fname,"output/");
-            strcat(out_fname,prefix);
-            strcat(out_fname,"_time_job");
-            strcat(out_fname,strnum);
-            strcat(out_fname,".dat");
-            // open output file for coefficients of Fock space expansion
-            c_file = openFileWrite(out_fname);
         }
         else
         {
             initGuess(nc,C);
-            c_file = NULL;
         }
         printf("\n\n\n\n\nCOMPUTING TIME EVOLUTION %d/%d",i+1,n_cases);
         sepline();
         // call (main)routine to compute the ground state
-        E0 = TIME_EVOLUTION(Nsteps,Tstep,Tinfo,Trec,c_file,
+        E0 = TIME_EVOLUTION(Nsteps,Tstep,Tinfo,Trec,prefix,i+1,
                             Npar,lmax,total_mom,C,Ho,g);
         // WRITE OUTPUT DATA IN A FILE
         fprintf(e_file,"\n%.10E %d %d %d ",E0/Npar,Npar,lmax,total_mom);
@@ -705,13 +803,12 @@ void TIME_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
             // set output file name
             strcpy(out_fname,"output/");
             strcat(out_fname,prefix);
-            strcat(out_fname,"_job");
+            strcat(out_fname,"_itimefinal_job");
             strcat(out_fname,strnum);
             strcat(out_fname,".dat");
             // record output ground-state from imaginary time
             carr_txt(out_fname,nc,C);
         }
-        if (c_file != NULL) fclose(c_file);
         free(C);
         free(Ho);
     }
@@ -721,7 +818,117 @@ void TIME_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
 
 
 
-void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
+void adjustInputProd(int n_cases, char prefix [])
+{
+
+    int
+        i,
+        j,
+        k,
+        n,
+        m,
+        ia,
+        La,
+        Lb,
+        NparA,
+        NparB,
+        lmaxA,
+        lmaxB,
+        sizeA,
+        sizeB,
+        total_size;
+    double
+        g,      // useless
+        boost;  // useless - just to use parLine function
+    char
+        strnum[5],
+        fname[100],
+        fnameA[100],
+        fnameB[100];
+    Iarray
+        * htA,
+        * htB;
+    Carray
+        Ca,
+        Cb,
+        C;
+    CompoundSpace
+        S;
+
+    // set file name with input data
+    strcpy(fnameA,prefix);
+    strcat(fnameA,"_specA.inp");
+    strcpy(fnameB,prefix);
+    strcat(fnameB,"_specB.inp");
+
+    for (i = 0; i < n_cases; i++)
+    {
+        sprintf(strnum,"%d",i+1);
+        parLine(fnameA,i,&NparA,&lmaxA,&La,&boost,&g);
+        parLine(fnameB,i,&NparB,&lmaxB,&Lb,&boost,&g);
+        // allocate multi-config. space information
+        sizeA = BFixedMom_mcsize(NparA,lmaxA,La);
+        sizeB = BFixedMom_mcsize(NparA,lmaxA,Lb);
+        htA = BAssembleHT(NparA,lmaxA,La,sizeA);
+        htB = BAssembleHT(NparB,lmaxB,Lb,sizeB);
+        S = AllocCompBasis(NparA,NparB,lmaxA,lmaxB,La+Lb);
+        total_size = S->size;
+        // allocate vector of coefficients
+        Ca = carrDef(sizeA);
+        Cb = carrDef(sizeB);
+        C = carrDef(total_size);
+        // set file name with input data of species A
+        strcpy(fname,"inp_data/");
+        strcat(fname,prefix);
+        strcat(fname,"_job");
+        strcat(fname,strnum);
+        strcat(fname,"_specA.dat");
+        // read the input data
+        carr_input_txt(fname,sizeA,Ca);
+        // set file name with input data of species B
+        strcpy(fname,"inp_data/");
+        strcat(fname,prefix);
+        strcat(fname,"_job");
+        strcat(fname,strnum);
+        strcat(fname,"_specB.dat");
+        // read the input data
+        carr_input_txt(fname,sizeB,Cb);
+        // transfer data to the compound space coefficients
+        for (k = 0; k < total_size; k++) C[k] = 0.0 + 0.0*I;
+        for (k = 0; k < sizeA; k++)
+        {
+            n = BBsubIndex(S,htA[k]);
+            ia = BgetIndex(S->lmaxA,S->sub[n].sizeA,S->sub[n].hta,htA[k]);
+            for (j = 0; j < sizeB; j++)
+            {
+                m = BBgetIndex_B(S,n,ia,htB[j]);
+                C[m] = Ca[k]*Cb[j];
+            }
+        }
+        assert_norm(total_size,C);
+        // record data in text file of coefficients in compound space
+        strcpy(fname,"inp_data/");
+        strcat(fname,prefix);
+        strcat(fname,"_job");
+        strcat(fname,strnum);
+        strcat(fname,".dat");
+        carr_txt(fname,total_size,C);
+        // free memory
+        for (k = 0; k < sizeA; k++) free(htA[k]);
+        free(htA);
+        for (k = 0; k < sizeB; k++) free(htB[k]);
+        free(htB);
+        free(Ca);
+        free(Cb);
+        free(C);
+        freeCompSpace(S);
+    }
+}
+
+
+
+void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo,
+     unsigned int inputType)
 {
     int
         i,
@@ -757,11 +964,12 @@ void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
         HoB;
 
     FILE
-        * e_file,
-        * c_file;
+        * e_file;
 
     CompoundSpace
         MixSpace;
+
+    if (inputType == 1) adjustInputProd(n_cases,prefix);
 
     // set file name with input data
     strcpy(in_fname,prefix);
@@ -770,7 +978,7 @@ void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
     // set name of file containing energy
     strcpy(e_fname,"output/");
     strcat(e_fname,prefix);
-    strcat(e_fname,"_energy.dat");
+    strcat(e_fname,"_timesetup.dat");
     e_file = openFileWrite(e_fname);
     fprintf(e_file,"# Energy per particle | N bosons A | lmax A ");
     fprintf(e_file,"| N bosons B | lmax B | Total Mom. | boost B ");
@@ -810,24 +1018,15 @@ void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
             strcat(init_fname,".dat");
             // read the input data
             carr_input_txt(init_fname,nc,C);
-            // set output file name
-            strcpy(out_fname,"output/");
-            strcat(out_fname,prefix);
-            strcat(out_fname,"_time_job");
-            strcat(out_fname,strnum);
-            strcat(out_fname,".dat");
-            // open output file for coefficients of Fock space expansion
-            c_file = openFileWrite(out_fname);
         }
         else
         {
             initGuess(nc,C);
-            c_file = NULL;
         }
-        printf("\n\n\n\n\nCOMPUTING GROUND STATE(MIXTURE) %d/%d",i+1,n_cases);
+        printf("\n\n\n\n\nTIME EVOLUTION(MIXTURE) %d/%d",i+1,n_cases);
         sepline();
         // call routine for the ground state
-        E0 = BB_TIME_EVOLUTION(Nsteps,Tstep,Tinfo,Trec,c_file,
+        E0 = BB_TIME_EVOLUTION(Nsteps,Tstep,Tinfo,Trec,prefix,i+1,
              MixSpace,C,HoA,HoB,g);
         // WRITE OUTPUT DATA IN A FILE
         fprintf(e_file,"\n%.10E ",E0/(NparA+NparB));
@@ -840,13 +1039,12 @@ void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
             // set output file name
             strcpy(out_fname,"output/");
             strcat(out_fname,prefix);
-            strcat(out_fname,"_job");
+            strcat(out_fname,"_itimefinal_job");
             strcat(out_fname,strnum);
             strcat(out_fname,".dat");
             // open output file
             carr_txt(out_fname,nc,C);
         }
-        if (c_file != NULL) fclose(c_file);
         free(C);
         free(HoA);
         free(HoB);
@@ -908,7 +1106,7 @@ void TIME_BOSEFERMI_SCANNING(int n_cases, char prefix [],
     // set name of file containing energy
     strcpy(e_fname,"output/");
     strcat(e_fname,prefix);
-    strcat(e_fname,"_energy.dat");
+    strcat(e_fname,"_timesetup.dat");
     e_file = openFileWrite(e_fname);
     fprintf(e_file,"# Energy per particle | N bosons | lmax Bosons ");
     fprintf(e_file,"| N Fermions | lmax Fermions | Total Mom. ");

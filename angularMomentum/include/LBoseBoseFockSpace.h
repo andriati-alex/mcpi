@@ -443,4 +443,17 @@ void PrintConfig(CompoundSpace S)
 
 
 
+void PrintMixSpaceInfo(CompoundSpace S)
+{
+    printf("\n\nSPACE INFORMATION\n");
+    printf("\t**************************************************\n");
+    printf("\t*  %d BOSONS IN |l| = %d AND %d BOSONS IN |l| = %d\n",
+           S->Na,S->lmaxA,S->Nb,S->lmaxB);
+    printf("\t*  %d FOCK STATES WITH %d TOTAL MOMENTUM\n",
+           S->size,S->L);
+    printf("\t**************************************************\n");
+}
+
+
+
 #endif

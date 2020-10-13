@@ -200,7 +200,7 @@ void BFgetConfigs(int k, BFCompoundSpace S, Iarray occB, Farray occF)
     if (k > S->size)
     {
         printf("\n\nERROR : The index %d of the configurations ",k);
-        printf("exceed the size of the compound space %d\n\n",S->size);
+        printf("exceed the size of the bose-fermi space %d\n\n",S->size);
         exit(EXIT_FAILURE);
     }
 
@@ -429,6 +429,19 @@ void PrintConfigBF(BFCompoundSpace S)
             exit(EXIT_FAILURE);
         }
     }
+}
+
+
+
+void PrintBFSpaceInfo(BFCompoundSpace S)
+{
+    printf("\n\nSPACE INFORMATION\n");
+    printf("\t***************************************************\n");
+    printf("\t*  %d BOSONS IN |l| = %d AND %d FERMIONS IN |l| = %d\n",
+           S->Nb,S->lmaxB,S->Nf,S->lmaxF);
+    printf("\t*  %d FOCK STATES WITH %d TOTAL MOMENTUM\n",
+           S->size,S->L);
+    printf("\t***************************************************\n");
 }
 
 

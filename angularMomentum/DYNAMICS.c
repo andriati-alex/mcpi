@@ -37,23 +37,21 @@ int main(int argc, char * argv[])
         c,
         typeA,  // Species A is aways bosons
         typeB;  // Can be either (b)osons or (f)ermions
-
     char
         TimeInfo[20],
         spec_name[20],
         inp_fname[100],
         fname_prefix[100];
-
+    unsigned int
+        InputInfo;
     int
         i,
         Njobs,  // number of lines as input parameters to evaluate
         Nspec,  // number of species must be 1 or 2
         nthreads;
-
     double
         time_used,
         record_interval;
-
     FILE
         * job_file;
 
@@ -79,18 +77,22 @@ int main(int argc, char * argv[])
         {
             case 1:
                 fscanf(job_file,"%d%c%c",&Nspec,&typeA,&typeB);
-                i = i + 1;
+                i++;
                 break;
             case 2:
                 fscanf(job_file,"%s",fname_prefix);
-                i = i + 1;
+                i++;
                 break;
             case 3:
                 fscanf(job_file,"%lf",&record_interval);
-                i = i + 1;
+                i++;
                 break;
             case 4:
                 fscanf(job_file,"%s",TimeInfo);
+                i++;
+                break;
+            case 5:
+                fscanf(job_file,"%d",&InputInfo);
                 break;
         }
         ReachNewLine(job_file);
@@ -99,8 +101,8 @@ int main(int argc, char * argv[])
     /* FINISHED READING OF CONFIGURATION PARAMETERS
     =================================================================== */
 
-    // Assess input parameter
-    if (i != 4)
+    // Assess input parameters
+    if (i != 5)
     {
         printf("\n\nINPUT ERROR : not enough input lines in job.conf\n\n");
         exit(EXIT_FAILURE);
@@ -150,7 +152,7 @@ int main(int argc, char * argv[])
             else
             {
                 TIME_MIXTURE_SCANNING(Njobs,fname_prefix,
-                    record_interval,TimeInfo[0]);
+                    record_interval,TimeInfo[0],InputInfo);
             }
             break;
     }

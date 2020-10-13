@@ -455,8 +455,8 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
     strcat(e_fname,prefix);
     strcat(e_fname,"_setup.dat");
     e_file = openFileWrite(e_fname);
-    fprintf(e_file,"# Energy per particle | Num. of Particles | lmax ");
-    fprintf(e_file,"| total mom. | boost | g");
+    fprintf(e_file,"# Num. of Particles | lmax ");
+    fprintf(e_file,"| total mom. | boost | g | Energy per Particle\n");
 
     for (i = 0; i < n_cases; i++)
     {
@@ -495,8 +495,8 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         // call (main)routine to compute the ground state
         E0 = GROUND_STATE(lan_it,Npar,lmax,total_mom,C,Ho,g);
         // WRITE OUTPUT DATA IN A FILE
-        fprintf(e_file,"\n%.10E %d %d %d ",E0/Npar,Npar,lmax,total_mom);
-        fprintf(e_file,"%.10E %.10E",boost,g);
+        fprintf(e_file,"%d %d %d ",Npar,lmax,total_mom);
+        fprintf(e_file,"%.10E %.10E %.10E\n",boost,g,E0/Npar);
         if (full_output)
         {
             // set output file name
@@ -566,9 +566,9 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
     strcat(e_fname,prefix);
     strcat(e_fname,"_setup.dat");
     e_file = openFileWrite(e_fname);
-    fprintf(e_file,"# Energy per particle | N bosons A | lmax A ");
+    fprintf(e_file,"# N bosons A | lmax A ");
     fprintf(e_file,"| N bosons B | lmax B | Total Mom. | boost B ");
-    fprintf(e_file,"| Ma / Mb | ga | gb | gab");
+    fprintf(e_file,"| Ma / Mb | ga | gb | gab | Energy per particle\n");
 
     for (i = 0; i < n_cases; i++)
     {
@@ -614,10 +614,10 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         // call routine for the ground state
         E0 = BOSEBOSE_GS(lan_it,MixSpace,C,HoA,HoB,g);
         // WRITE OUTPUT DATA IN A FILE
-        fprintf(e_file,"\n%.10E ",E0/(NparA+NparB));
         fprintf(e_file,"%d %d %d %d %d ",NparA,lmaxA,NparB,lmaxB,total_mom);
         fprintf(e_file,"%.10E %.10E ",boost,MassImbal);
-        fprintf(e_file,"%.10E %.10E %.10E",g[0],g[1],g[2]);
+        fprintf(e_file,"%.10E %.10E %.10E ",g[0],g[1],g[2]);
+        fprintf(e_file,"%.10E\n",E0/(NparA+NparB));
         if (full_output)
         {
             // set output filename for coefficients
@@ -689,9 +689,10 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
     strcat(e_fname,prefix);
     strcat(e_fname,"_setup.dat");
     e_file = openFileWrite(e_fname);
-    fprintf(e_file,"# Energy per particle | N bosons | lmax Bosons ");
+    fprintf(e_file,"# N bosons | lmax Bosons ");
     fprintf(e_file,"| N Fermions | lmax Fermions | Total Mom. ");
-    fprintf(e_file,"| Boost Fermions | Mb / Mf | gb | gbf");
+    fprintf(e_file,"| Boost Fermions | Mb / Mf | gb | gbf | ");
+    fprintf(e_file,"Energy per particle\n");
 
     for (i = 0; i < n_cases; i++)
     {
@@ -737,10 +738,10 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         // call routine for the ground state
         E0 = BOSEFERMI_GS(lan_it,MixSpace,C,HoB,HoF,g);
         // WRITE OUTPUT DATA IN A FILE
-        fprintf(e_file,"\n%.10E ",E0/(NparB+NparF));
         fprintf(e_file,"%d %d %d %d %d ",NparB,lmaxB,NparF,lmaxF,total_mom);
         fprintf(e_file,"%.10E %.10E ",boost,MassImbal);
-        fprintf(e_file,"%.10E %.10E",g[0],g[2]);
+        fprintf(e_file,"%.10E %.10E ",g[0],g[2]);
+        fprintf(e_file,"%.10E\n",E0/(NparB+NparF));
         if (full_output)
         {
             // set output filename for coefficients

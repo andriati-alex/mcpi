@@ -70,7 +70,18 @@ int stopLanczos(int Niter, Carray diag, Carray offdiag, double * previousE)
     k = LAPACKE_dstev(LAPACK_ROW_MAJOR,'V',Niter,d,e,eigvec,Niter);
     if (k != 0)  LAPACK_PROBLEM(k,"stopLanczos");
 
-    err = fabs(creal(offdiag[Niter-2])*eigvec[(Niter-1)*Niter]/d[0]);
+    // compute relative error of the current lowest eigenvalue approx.
+    // If the eigenvalue is close enough to zero (up to pre-defined
+    // tolerance by LNCZS_STOP_TOL) compute just the absolute error
+    // to avoid zero-division
+    if (fabs(d[0]) > LNCZS_STOP_TOL)
+    {
+        err = fabs(creal(offdiag[Niter-2])*eigvec[(Niter-1)*Niter]/d[0]);
+    }
+    else
+    {
+        err = fabs(creal(offdiag[Niter-2])*eigvec[(Niter-1)*Niter]);
+    }
 
     printf("\nRelativeError : %.7lf",err);
 

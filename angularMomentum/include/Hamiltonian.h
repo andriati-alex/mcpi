@@ -2715,7 +2715,7 @@ void bosefermi_actH(BFCompoundSpace S, Carray HoB, Carray HoF, double g [],
                     else             up = Nlb-1-k;
                     for(q = low; q <= up; q++)
                     {
-                        // Avoid case of without momentum exchanged
+                        // Avoid case without momentum exchanged
                         if (q == 0) continue;
                         // avoid unpopulated states and creation on
                         // already occupied fermionic state
