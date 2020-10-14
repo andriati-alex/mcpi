@@ -2,6 +2,7 @@
 #define _GroundStateDrivers_h
 
 #include "LanczosRoutines.h"
+#include "MomentumObservables.h"
 
 
 
@@ -15,8 +16,8 @@
 
 
 
-double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
-                    Carray Ho, double g)
+double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, int nc,
+       Iarray * ht, Carray C, Carray Ho, double g)
 {
 
 /** Find the lowest Eigenvalue using Lanczos tridiagonal decomposition
@@ -31,12 +32,9 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
         i,
         k,
         j,
-        nc,
         predictedIter;
     double
         GSenergy;
-    Iarray
-        * ht;
     Rarray
         d,
         e,
@@ -52,8 +50,6 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
     // empty system
     if (Npar == 0) return 0;
 
-    // Configurational basis setup
-    nc = BFixedMom_mcsize(Npar,lmax,total_mom);
     // Assert the config. space is not void
     if (nc == 0)
     {
@@ -63,7 +59,6 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
         exit(EXIT_FAILURE);
     }
 
-    ht = BAssembleHT(Npar,lmax,total_mom,nc);
     H = boseH(Npar,lmax,nc,ht,Ho,g);
     if (H == NULL) printf("\nWithout set Hamiltonian matrix\n");
     else           printf("\nUsing (sparse) Hamiltonian matrix\n");
@@ -148,8 +143,6 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, Carray C,
     // free matrices
     for (i = 0; i < predictedIter; i++) free(lvec[i]);
     free(lvec);
-    for (i = 0; i < nc; i++) free(ht[i]);
-    free(ht);
     // If the Hamiltonian matrix could be allocated free it
     if (H != NULL) freeHmat(H);
 
@@ -426,23 +419,23 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         lan_it,
         total_mom,
         coefMemory;
-
     double
         l,
         g,
         E0,
         boost;
-
     char
         strnum[10],
         e_fname[100],
         in_fname[100],
         out_fname[100];
-
+    Iarray
+        * ht;
+    Rarray
+        avgocc;
     Carray
         C,
         Ho;
-
     FILE *
         e_file;
 
@@ -467,6 +460,7 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         parLine(in_fname,i,&Npar,&lmax,&total_mom,&boost,&g);
         // number of configuration(nc) - config. space dimension
         nc = BFixedMom_mcsize(Npar,lmax,total_mom);
+        ht = BAssembleHT(Npar,lmax,total_mom,nc);
         printf("\n\n\n\n\nCOMPUTING GROUND STATE %d/%d",i+1,n_cases);
         sepline();
         // set up (default)  number of Lanczos iterations
@@ -493,10 +487,15 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         C = carrDef(nc);
         initGuess(nc,C);
         // call (main)routine to compute the ground state
-        E0 = GROUND_STATE(lan_it,Npar,lmax,total_mom,C,Ho,g);
+        E0 = GROUND_STATE(lan_it,Npar,lmax,total_mom,nc,ht,C,Ho,g);
+        // compute average occupations in single particle states
+        avgocc = rarrDef(2*lmax+1);
+        single_avgocc(Npar,lmax,nc,ht,C,avgocc);
         // WRITE OUTPUT DATA IN A FILE
         fprintf(e_file,"%d %d %d ",Npar,lmax,total_mom);
-        fprintf(e_file,"%.10E %.10E %.10E\n",boost,g,E0/Npar);
+        fprintf(e_file,"%.10E %.10E %.10E",boost,g,E0/Npar);
+        for (j = 0; j < 2*lmax+1; j++) fprintf(e_file," %.10lf",avgocc[j]);
+        fprintf(e_file,"\n");
         if (full_output)
         {
             // set output file name
@@ -508,8 +507,11 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
             // open output file
             carr_txt(out_fname,nc,C);
         }
+        free(avgocc);
         free(C);
         free(Ho);
+        for (j = 0; j < nc; j++) free(ht[j]);
+        free(ht);
     }
 
     fclose(e_file);
@@ -530,30 +532,32 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         lan_it,
         total_mom,
         coefMemory;
-
     double
         l,
         E0,
         boost,
-        MassImbal;
-
+        MassImbal,
+        avgLA,
+        avgLB,
+        variA,
+        variB,
+        covAB;
     double
         g[3];
-
+    Rarray
+        avgoccA,
+        avgoccB;
     char
         strnum[10],
         e_fname[100],
         in_fname[100],
         out_fname[100];
-
     Carray
         C,
         HoA,
         HoB;
-
-    FILE *
-        e_file;
-
+    FILE
+        * e_file;
     CompoundSpace
         MixSpace;
 
@@ -613,11 +617,32 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         initGuess(nc,C);
         // call routine for the ground state
         E0 = BOSEBOSE_GS(lan_it,MixSpace,C,HoA,HoB,g);
+        // compute some observables
+        avgoccA = rarrDef(2*lmaxA+1);
+        avgoccB = rarrDef(2*lmaxB+1);
+        mixture_avgocc(MixSpace,C,'A',avgoccA);
+        mixture_avgocc(MixSpace,C,'B',avgoccB);
+        avgLA = mixture_avgmom(MixSpace,C,'A');
+        avgLB = mixture_avgmom(MixSpace,C,'B');
+        variA = mixture_momvariance(MixSpace,C,'A');
+        variB = mixture_momvariance(MixSpace,C,'B');
+        covAB = mixture_momcov(MixSpace,C);
         // WRITE OUTPUT DATA IN A FILE
         fprintf(e_file,"%d %d %d %d %d ",NparA,lmaxA,NparB,lmaxB,total_mom);
         fprintf(e_file,"%.10E %.10E ",boost,MassImbal);
         fprintf(e_file,"%.10E %.10E %.10E ",g[0],g[1],g[2]);
-        fprintf(e_file,"%.10E\n",E0/(NparA+NparB));
+        fprintf(e_file,"%.10E ",E0/(NparA+NparB));
+        fprintf(e_file,"%13.10lf %13.10lf ",avgLA,avgLB);
+        fprintf(e_file,"%13.10lf %13.10lf %13.10lf",variA,variB,covAB);
+        for (j = 0; j < 2*lmaxA+1; j++)
+        {
+            fprintf(e_file," %.10lf",avgoccA[j]);
+        }
+        for (j = 0; j < 2*lmaxB+1; j++)
+        {
+            fprintf(e_file," %.10lf",avgoccB[j]);
+        }
+        fprintf(e_file,"\n");
         if (full_output)
         {
             // set output filename for coefficients
@@ -629,6 +654,8 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
             // open output file
             carr_txt(out_fname,nc,C);
         }
+        free(avgoccA);
+        free(avgoccB);
         free(C);
         free(HoA);
         free(HoB);

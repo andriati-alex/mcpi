@@ -893,8 +893,6 @@ void SCANNING_MIXTURE_ANALYSIS(char prefix [])
         lmaxA,
         lmaxB,
         Ncases;
-    double
-        energy;
     char
         fname[100],
         strnum[5];
@@ -940,7 +938,6 @@ void SCANNING_MIXTURE_ANALYSIS(char prefix [])
         printf("\n[%3d/%d] Working ...",i+1,Ncases);
 
         // READ PARAMETERS
-        fscanf(setup_file,"%lf",&energy);
         fscanf(setup_file,"%d",&NparA);  // Num. of particles type A
         fscanf(setup_file,"%d",&lmaxA);  // max. individual ang. momemtum
         fscanf(setup_file,"%d",&NparB);  // Num. of particles type B
@@ -1029,10 +1026,6 @@ void SCANNING_BOSEFERMI_ANALYSIS(char prefix [])
         lmaxB,
         Ncases;
     double
-        v,
-        mi,
-        energy;
-    double
         g[3];
     char
         fname[100],
@@ -1057,8 +1050,8 @@ void SCANNING_BOSEFERMI_ANALYSIS(char prefix [])
     rarr_txt(fname,2*NGRID_POINTS+1,gridPoints);
     free(gridPoints);
 
-    RDM_F = carrDef(NGRID_POINTS);
-    RDM_B = carrDef(NGRID_POINTS);
+    RDM_F = carrDef(2*NGRID_POINTS+1);
+    RDM_B = carrDef(2*NGRID_POINTS+1);
     denCov = carrDef(2*NGRID_POINTS+1);
 
     strcpy(fname,OUTPUT_PATH);
@@ -1075,7 +1068,6 @@ void SCANNING_BOSEFERMI_ANALYSIS(char prefix [])
         printf("\n[%3d/%d] Working ...",i+1,Ncases);
 
         // READ PARAMETERS
-        fscanf(setup_file,"%lf",&energy);
         fscanf(setup_file,"%d",&NparB);  // Num. of particles type A
         fscanf(setup_file,"%d",&lmaxB);  // max. individual ang. momemtum
         fscanf(setup_file,"%d",&NparF);  // Num. of particles type B
@@ -1113,14 +1105,14 @@ void SCANNING_BOSEFERMI_ANALYSIS(char prefix [])
         strcat(fname,"_rdmB");
         strcat(fname,strnum);
         strcat(fname,".dat");
-        carr_txt(fname,NGRID_POINTS,RDM_B);
+        carr_txt(fname,2*NGRID_POINTS+1,RDM_B);
         // set file name with 1-RDM of species B
         strcpy(fname,OUTPUT_PATH);
         strcat(fname,prefix);
         strcat(fname,"_rdmF");
         strcat(fname,strnum);
         strcat(fname,".dat");
-        carr_txt(fname,NGRID_POINTS,RDM_F);
+        carr_txt(fname,2*NGRID_POINTS+1,RDM_F);
 
         free(C);
         freeBoseFermiSpace(MixSpace);
