@@ -46,7 +46,7 @@ double TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         H;
     char
         fname[100],
-        jobIdstr[5];
+        jobIdstr[100];
     FILE
         * dataf,
         * timef;
@@ -295,7 +295,7 @@ double BB_TIME_EVOLUTION(int Nsteps, double Tstep, char Tinfo, double Trec,
         H;
     char
         fname[100],
-        jobIdstr[5];
+        jobIdstr[100];
     FILE
         * timef,
         * dataf;
@@ -733,7 +733,7 @@ void TIME_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo)
         Tstep,
         boost;
     char
-        strnum[10],
+        strnum[100],
         e_fname[100],
         in_fname[100],
         out_fname[100],
@@ -841,7 +841,7 @@ void adjustInputProd(int n_cases, char prefix [])
         g,      // useless
         boost;  // useless - just to use parLine function
     char
-        strnum[5],
+        strnum[100],
         fname[100],
         fnameA[100],
         fnameB[100];
@@ -952,7 +952,7 @@ void TIME_MIXTURE_SCANNING(int n_cases, char prefix [], double Trec, char Tinfo,
         g[3];
 
     char
-        strnum[10],
+        strnum[100],
         e_fname[100],
         in_fname[100],
         out_fname[100],
@@ -1081,7 +1081,7 @@ void TIME_BOSEFERMI_SCANNING(int n_cases, char prefix [],
         g[3];
 
     char
-        strnum[10],
+        strnum[100],
         e_fname[100],
         in_fname[100],
         out_fname[100],

@@ -425,7 +425,7 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         E0,
         boost;
     char
-        strnum[10],
+        strnum[100],
         e_fname[100],
         in_fname[100],
         out_fname[100];
@@ -548,7 +548,7 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         avgoccA,
         avgoccB;
     char
-        strnum[10],
+        strnum[100],
         e_fname[100],
         in_fname[100],
         out_fname[100];
@@ -691,7 +691,7 @@ void BOSEFERMI_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         g[3];
 
     char
-        strnum[10],
+        strnum[100],
         e_fname[100],
         in_fname[100],
         out_fname[100];

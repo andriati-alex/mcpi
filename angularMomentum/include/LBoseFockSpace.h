@@ -166,8 +166,8 @@ int BFixedMom_mcsize(int N, int lmax, int totalL)
             printf("multiconfg. space, the approximated memory demanded ");
             printf("to set the hashing table for %d particles ",N);
             printf("subject to lmax = %d is ",lmax);
-            printf("%.1lf\n",((double) MEMORY_TOL)/1E9);
-            printf("Stopped at function 'BFixedMom_mcsize'\n\n");
+            printf("%.3lf > %.3lf(Mb)",((double) MemReq)/1E6,MEMORY_TOL/1E6);
+            printf("\n\nStopped at function 'BFixedMom_mcsize'\n\n");
             exit(EXIT_FAILURE);
         }
     }

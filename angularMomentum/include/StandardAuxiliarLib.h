@@ -407,13 +407,13 @@ void ReachNewLine(FILE * f)
 {
 
 /** Read until get new line in a opened file. **/
-
+    int
+        scanReturn;
     char
         sentinel;
-
     while (1)
     {
-        fscanf(f,"%c",&sentinel);
+        scanReturn = fscanf(f,"%c",&sentinel);
         if (sentinel == '\n' || sentinel == EOF) return;
     }
 }
@@ -538,11 +538,11 @@ void parLine(char fname [], int line, int * N, int * lmax, int * L,
     for (i = 0; i < line; i++) ReachNewLine(in_file);
 
     // read parameters
-    fscanf(in_file,"%d",N);     // Number of particles
-    fscanf(in_file,"%d",lmax);  // max. individual ang. momentum
-    fscanf(in_file,"%d",L);     // total angular momentum constraint
-    fscanf(in_file,"%lf",v);    // frame velocity
-    fscanf(in_file,"%lf",g);    // contact interaction strength parameter
+    i = fscanf(in_file,"%d",N);     // Number of particles
+    i = fscanf(in_file,"%d",lmax);  // max. individual ang. momentum
+    i = fscanf(in_file,"%d",L);     // total angular momentum constraint
+    i = fscanf(in_file,"%lf",v);    // frame velocity
+    i = fscanf(in_file,"%lf",g);    // contact interaction strength parameter
 
     fclose(in_file);
 }
@@ -567,17 +567,17 @@ void mixParLine(char fname [], int line, int * NA, int * lmaxA, int * NB,
     for (i = 0; i < line; i++) ReachNewLine(in_file);
 
     // read parameters
-    fscanf(in_file,"%d",NA);    // Num. of particles A (aways bosons)
-    fscanf(in_file,"%d",lmaxA); // max. individual ang. momemtum
-    fscanf(in_file,"%d",NB);    // Num. of particles B (bosons or fermions)
-    fscanf(in_file,"%d",lmaxB); // max. individual ang. momentum
-    fscanf(in_file,"%d",L);     // Total ang. momentum constraint
-    fscanf(in_file,"%lf",v);     // frame velocity
-    fscanf(in_file,"%lf",mi);    // mass imbalance
+    i = fscanf(in_file,"%d",NA);    // Num. of particles A (aways bosons)
+    i = fscanf(in_file,"%d",lmaxA); // max. individual ang. momemtum
+    i = fscanf(in_file,"%d",NB);    // Num. of particles B (bosons or fermions)
+    i = fscanf(in_file,"%d",lmaxB); // max. individual ang. momentum
+    i = fscanf(in_file,"%d",L);     // Total ang. momentum constraint
+    i = fscanf(in_file,"%lf",v);     // frame velocity
+    i = fscanf(in_file,"%lf",mi);    // mass imbalance
     // CONTACT INTERACTION STRENGTH PARAMETERS
-    fscanf(in_file,"%lf",&g[0]);    // of particles A
-    fscanf(in_file,"%lf",&g[1]);    // of particles B (ignored for fermions)
-    fscanf(in_file,"%lf",&g[2]);    // interspecies interaction
+    i = fscanf(in_file,"%lf",&g[0]);    // of particles A
+    i = fscanf(in_file,"%lf",&g[1]);    // of particles B (ignored for fermions)
+    i = fscanf(in_file,"%lf",&g[2]);    // interspecies interaction
 
     fclose(in_file);
 }
@@ -602,13 +602,13 @@ void parLine_time(char fname [], int line, int * N, int * lmax, int * L,
     for (i = 0; i < line; i++) ReachNewLine(in_file);
 
     // read parameters
-    fscanf(in_file,"%d",N);     // Number of particles
-    fscanf(in_file,"%d",lmax);  // max. individual ang. momentum
-    fscanf(in_file,"%d",L);     // total angular momentum constraint
-    fscanf(in_file,"%lf",v);    // frame velocity
-    fscanf(in_file,"%lf",g);    // contact interaction strength parameter
-    fscanf(in_file,"%d",Nsteps);
-    fscanf(in_file,"%lf",dt);
+    i = fscanf(in_file,"%d",N);     // Number of particles
+    i = fscanf(in_file,"%d",lmax);  // max. individual ang. momentum
+    i = fscanf(in_file,"%d",L);     // total angular momentum constraint
+    i = fscanf(in_file,"%lf",v);    // frame velocity
+    i = fscanf(in_file,"%lf",g);    // contact interaction strength parameter
+    i = fscanf(in_file,"%d",Nsteps);
+    i = fscanf(in_file,"%lf",dt);
 
     fclose(in_file);
 }
@@ -634,19 +634,19 @@ void mixParLine_time(char fname [], int line, int * NA, int * lmaxA,
     for (i = 0; i < line; i++) ReachNewLine(in_file);
 
     // read parameters
-    fscanf(in_file,"%d",NA);    // Num. of particles A (aways bosons)
-    fscanf(in_file,"%d",lmaxA); // max. individual ang. momemtum
-    fscanf(in_file,"%d",NB);    // Num. of particles B (bosons or fermions)
-    fscanf(in_file,"%d",lmaxB); // max. individual ang. momentum
-    fscanf(in_file,"%d",L);     // Total ang. momentum constraint
-    fscanf(in_file,"%lf",v);     // frame velocity
-    fscanf(in_file,"%lf",mi);    // mass imbalance
+    i = fscanf(in_file,"%d",NA);    // Num. of particles A (aways bosons)
+    i = fscanf(in_file,"%d",lmaxA); // max. individual ang. momemtum
+    i = fscanf(in_file,"%d",NB);    // Num. of particles B (bosons or fermions)
+    i = fscanf(in_file,"%d",lmaxB); // max. individual ang. momentum
+    i = fscanf(in_file,"%d",L);     // Total ang. momentum constraint
+    i = fscanf(in_file,"%lf",v);     // frame velocity
+    i = fscanf(in_file,"%lf",mi);    // mass imbalance
     // CONTACT INTERACTION STRENGTH PARAMETERS
-    fscanf(in_file,"%lf",&g[0]);    // of particles A
-    fscanf(in_file,"%lf",&g[1]);    // of particles B (ignored for fermions)
-    fscanf(in_file,"%lf",&g[2]);    // interspecies interaction
-    fscanf(in_file,"%d",Nsteps);
-    fscanf(in_file,"%lf",dt);
+    i = fscanf(in_file,"%lf",&g[0]);    // of particles A
+    i = fscanf(in_file,"%lf",&g[1]);    // of particles B (ignored for fermions)
+    i = fscanf(in_file,"%lf",&g[2]);    // interspecies interaction
+    i = fscanf(in_file,"%d",Nsteps);
+    i = fscanf(in_file,"%lf",dt);
 
     fclose(in_file);
 }

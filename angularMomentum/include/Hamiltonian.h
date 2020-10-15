@@ -2526,7 +2526,6 @@ void bosefermi_actH(BFCompoundSpace S, Carray HoB, Carray HoF, double g [],
         s,
         q,
         n,
-        iB,
         iF,
         up,
         low,
@@ -2556,7 +2555,7 @@ void bosefermi_actH(BFCompoundSpace S, Carray HoB, Carray HoF, double g [],
     gb = g[0];
     gbf = g[2];
 
-    #pragma omp parallel private(i,j,k,s,q,l,n,iB,iF,up,low,bosef,fermif,\
+    #pragma omp parallel private(i,j,k,s,q,l,n,iF,up,low,bosef,fermif,\
                                  w,zb,zbf,vB,vF,threadId,nthreads)
     {
         threadId = omp_get_thread_num();

@@ -797,7 +797,7 @@ void SCANNING_ANALYSIS(char prefix [])
         Ncases;
     char
         fname[100],
-        strnum[5];
+        strnum[100];
     Iarray
         * ht;
     Rarray
@@ -895,7 +895,7 @@ void SCANNING_MIXTURE_ANALYSIS(char prefix [])
         Ncases;
     char
         fname[100],
-        strnum[5];
+        strnum[100];
     Rarray
         gridPoints;
     Carray
@@ -1029,7 +1029,7 @@ void SCANNING_BOSEFERMI_ANALYSIS(char prefix [])
         g[3];
     char
         fname[100],
-        strnum[5];
+        strnum[100];
     Rarray
         gridPoints;
     Carray

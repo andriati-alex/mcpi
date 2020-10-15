@@ -337,6 +337,10 @@ void impRestart(int nc, int kp, Cmatrix lvec, Carray diag, Carray offdiag,
     printf("\n\n");
 */
 
+    free(d);
+    free(e);
+    free(eigvec);
+    free(shifts);
     rmatFree(kp,A);
     rmatFree(kp,Q);
     rmatFree(kp,Qk);
@@ -1292,8 +1296,7 @@ void LNCZS_HMAT_TIME(int nc, HConfMat H, Carray diag, Carray offdiag,
 
     double
         tol,
-        maxCheck,
-        energy;
+        maxCheck;
 
     double complex
         hc_update;
@@ -1405,9 +1408,7 @@ void LNCZS_TIME(int nc, int lmax, Iarray * ht, Carray Ho, double g,
 
     double
         tol,
-        maxCheck,
-        energy;
-
+        maxCheck;
     double complex
         hc_update;
 
@@ -1609,15 +1610,11 @@ void LNCZS_BFMIX_TIME(BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
         lm,
         threadId,
         nthreads;
-
     double
         tol,
-        maxCheck,
-        energy;
-
+        maxCheck;
     double complex
         hc_update;
-
     Carray
         HC,
         ortho;

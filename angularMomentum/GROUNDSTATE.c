@@ -37,24 +37,20 @@ int main(int argc, char * argv[])
         c,
         typeA,  // Species A is aways bosons
         typeB;  // Can be either (b)osons or (f)ermions
-
     char
         spec_name[20],
         inp_fname[100],
         fname_prefix[50];
-
     unsigned int
         full_output;
-
     int
         i,
         Njobs,  // number of lines as input parameters to evaluate
         Nspec,  // number of species must be 1 or 2
-        nthreads;
-
+        nthreads,
+        scanReturn;
     double
         time_used;
-
     FILE
         * job_file;
 
@@ -80,15 +76,15 @@ int main(int argc, char * argv[])
         switch (i)
         {
             case 1:
-                fscanf(job_file,"%d%c%c",&Nspec,&typeA,&typeB);
+                scanReturn = fscanf(job_file,"%d%c%c",&Nspec,&typeA,&typeB);
                 i = i + 1;
                 break;
             case 2:
-                fscanf(job_file,"%s",fname_prefix);
+                scanReturn = fscanf(job_file,"%s",fname_prefix);
                 i = i + 1;
                 break;
             case 3:
-                fscanf(job_file,"%d",&full_output);
+                scanReturn = fscanf(job_file,"%d",&full_output);
                 i = i + 1;
                 break;
         }
