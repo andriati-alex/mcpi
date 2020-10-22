@@ -28,7 +28,8 @@
 
 
 
-int stopLanczos(int Niter, Carray diag, Carray offdiag, double * previousE)
+int stopLanczos(int Niter, Carray diag, Carray offdiag, double * previousE,
+                int supp)
 {
 
 /** IN BETWEEN LANCZOS INTERACTIONS, PROVIDE A CONVERGENCE CRITERION TO STOP
@@ -83,7 +84,7 @@ int stopLanczos(int Niter, Carray diag, Carray offdiag, double * previousE)
         err = fabs(creal(offdiag[Niter-2])*eigvec[(Niter-1)*Niter]);
     }
 
-    printf("\nRelativeError : %.7lf",err);
+    if (!supp) printf("\nRelativeError : %.7lf",err);
 
     // if (1.0 - d[0]/(*previousE) < LNCZS_STOP_TOL) shallStop = 1;
     if (err < LNCZS_STOP_TOL) shallStop = 1;
@@ -350,7 +351,7 @@ void impRestart(int nc, int kp, Cmatrix lvec, Carray diag, Carray offdiag,
 
 
 int LNCZS_HMAT(int lm, int Npar, int nc, HConfMat H, Carray diag,
-               Carray offdiag, Cmatrix lvec)
+               Carray offdiag, Cmatrix lvec, int supp)
 {
 
 /** IMPROVED LANCZOS ITERATIONS WITH REORTHOGONALIZATION USING H. MATRIX
@@ -381,8 +382,11 @@ int LNCZS_HMAT(int lm, int Npar, int nc, HConfMat H, Carray diag,
         HC,
         ortho;
 
-    printf("\nLANCZOS ITERATIONS\n");
-    printf(" * Progress");
+    if (!supp)
+    {
+        printf("\nLANCZOS ITERATIONS\n");
+        printf(" * Progress");
+    }
 
     Niter = 0;
 
@@ -396,8 +400,6 @@ int LNCZS_HMAT(int lm, int Npar, int nc, HConfMat H, Carray diag,
     ortho = carrDef(lm);
 
     // Initiate the method
-    //applyHconf_omp(Npar,Morb,Map,MapOT,MapTT,strideOT,strideTT,IF,
-    //               lvec[0],Ho,Hint,HC);
     matmul(nc,H->rows,H->cols,H->vals,lvec[0],HC);
     diag[0] = carrDot(nc,lvec[0],HC);
     energy = creal(diag[0]);
@@ -435,15 +437,18 @@ int LNCZS_HMAT(int lm, int Npar, int nc, HConfMat H, Carray diag,
         // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
         if ((i+1) % 10 == 0)
         {
-            if (stopLanczos(i+1,diag,offdiag,&energy))
+            if (stopLanczos(i+1,diag,offdiag,&energy,supp))
             {
-                printf(" | Energy per particle : %.7lf",energy/Npar);
+                if (!supp)
+                {
+                    printf(" | Energy per particle : %.7lf",energy/Npar);
+                    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
+                }
                 free(HC);
                 free(ortho);
-                printf("\n============= FINISHED LANCZOS ITERATIONS\n");
                 return i+1;
             }
-            printf(" | Energy per particle : %.7lf",energy/Npar);
+            if (!supp) printf(" | Energy per particle : %.7lf",energy/Npar);
         }
         // -------------------------------------------------------
 
@@ -475,17 +480,20 @@ int LNCZS_HMAT(int lm, int Npar, int nc, HConfMat H, Carray diag,
         }
 
         Niter++;
-        printf("\n  %3d/%d",i+1,lm);
+        if (!supp) printf("\n  %3d/%d",i+1,lm);
     }
 
     /************************************************************************
     ************   RESTART ITERATIONS TO IMPROVE LANCZOS SPACE   ************
     *************************************************************************/
 
-    while (!stopLanczos(lm,diag,offdiag,&energy))
+    while (!stopLanczos(lm,diag,offdiag,&energy,1))
     {
-        printf(" | Energy per particle : %.7lf",energy/Npar);
-        printf("\n------------- IMPLICIT RESTART");
+        if (!supp)
+        {
+            printf(" | Energy per particle : %.7lf",energy/Npar);
+            printf("\n------------- IMPLICIT RESTART");
+        }
 
         // Implicit restart algorithm requires one extra Lanczos vector
         extraB = carrNorm(nc,HC);                           // beta k+p
@@ -522,18 +530,20 @@ int LNCZS_HMAT(int lm, int Npar, int nc, HConfMat H, Carray diag,
             diag[i + 1] = carrDot(nc,lvec[i + 1],HC);
 
             // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
+            /*
             if ((i+1) % 10 == 0)
             {
                 if (stopLanczos(i+1,diag,offdiag,&energy))
                 {
                     printf(" | Energy per particle : %.7lf",energy/Npar);
+                    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
                     free(HC);
                     free(ortho);
-                    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
                     return i+1;
                 }
                 printf(" | Energy per particle : %.7lf",energy/Npar);
             }
+            */
             // -------------------------------------------------------
 
             for (j = 0; j < nc; j++)
@@ -563,11 +573,11 @@ int LNCZS_HMAT(int lm, int Npar, int nc, HConfMat H, Carray diag,
                 }
             }
             Niter++;
-            printf("\n  %3d/%d | %d",i+1,lm,Niter);
+            if (!supp) printf("\n  %3d/%d | %d",i+1,lm,Niter);
         }
     }
 
-    printf("\n============= FINISHED LANCZOS ITERATIONS\n");
+    if (!supp) printf("\n============= FINISHED LANCZOS ITERATIONS\n");
 
     free(ortho);
     free(HC);
@@ -669,7 +679,7 @@ int LNCZS_HACT(int lm, int nc, int lmax, Iarray * ht, Carray Ho, double g,
         // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
         if ((i+1) % 10 == 0)
         {
-            if (stopLanczos(i+1,diag,offdiag,&energy))
+            if (stopLanczos(i+1,diag,offdiag,&energy,0))
             {
                 printf(" | Energy per particle : %.7lf",energy/Npar);
                 free(HC);
@@ -716,7 +726,7 @@ int LNCZS_HACT(int lm, int nc, int lmax, Iarray * ht, Carray Ho, double g,
     ************   RESTART ITERATIONS TO IMPROVE LANCZOS SPACE   ************
     *************************************************************************/
 
-    while (!stopLanczos(lm,diag,offdiag,&energy))
+    while (!stopLanczos(lm,diag,offdiag,&energy,0))
     {
         printf(" | Energy per particle : %.7lf",energy/Npar);
         printf("\n------------- IMPLICIT RESTART");
@@ -755,9 +765,10 @@ int LNCZS_HACT(int lm, int nc, int lmax, Iarray * ht, Carray Ho, double g,
             diag[i + 1] = carrDot(nc,lvec[i + 1],HC);
 
             // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
+            /*
             if ((i+1) % 10 == 0)
             {
-                if (stopLanczos(i+1,diag,offdiag,&energy))
+                if (stopLanczos(i+1,diag,offdiag,&energy,0))
                 {
                     printf(" | Energy per particle : %.7lf",energy/Npar);
                     free(HC);
@@ -767,6 +778,7 @@ int LNCZS_HACT(int lm, int nc, int lmax, Iarray * ht, Carray Ho, double g,
                 }
                 printf(" | Energy per particle : %.7lf",energy/Npar);
             }
+            */
             // -------------------------------------------------------
 
             for (j = 0; j < nc; j++)
@@ -900,7 +912,7 @@ int LNCZS_BBMIX(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
         // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
         if ((i+1) % 10 == 0)
         {
-            if (stopLanczos(i+1,diag,offdiag,&energy))
+            if (stopLanczos(i+1,diag,offdiag,&energy,0))
             {
                 printf(" | Energy per particle : %.7lf",energy/Npar);
                 free(HC);
@@ -947,7 +959,7 @@ int LNCZS_BBMIX(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
     ************   RESTART ITERATIONS TO IMPROVE LANCZOS SPACE   ************
     *************************************************************************/
 
-    while (!stopLanczos(lm,diag,offdiag,&energy))
+    while (!stopLanczos(lm,diag,offdiag,&energy,0))
     {
         printf(" | Energy per particle : %.7lf",energy/Npar);
         printf("\n------------- IMPLICIT RESTART");
@@ -986,9 +998,10 @@ int LNCZS_BBMIX(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
             diag[i + 1] = carrDot(nc,lvec[i + 1],HC);
 
             // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
+            /*
             if ((i+1) % 10 == 0)
             {
-                if (stopLanczos(i+1,diag,offdiag,&energy))
+                if (stopLanczos(i+1,diag,offdiag,&energy,0))
                 {
                     printf(" | Energy per particle : %.7lf",energy/Npar);
                     free(HC);
@@ -998,6 +1011,7 @@ int LNCZS_BBMIX(int lm, CompoundSpace MixSpace, Carray HoA, Carray HoB,
                 }
                 printf(" | Energy per particle : %.7lf",energy/Npar);
             }
+            */
             // -------------------------------------------------------
 
             for (j = 0; j < nc; j++)
@@ -1131,7 +1145,7 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
         // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
         if ((i+1) % 10 == 0)
         {
-            if (stopLanczos(i+1,diag,offdiag,&energy))
+            if (stopLanczos(i+1,diag,offdiag,&energy,0))
             {
                 printf(" | Energy per particle : %.7lf",energy/Npar);
                 free(HC);
@@ -1178,7 +1192,7 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
     ************   RESTART ITERATIONS TO IMPROVE LANCZOS SPACE   ************
     *************************************************************************/
 
-    while (!stopLanczos(lm,diag,offdiag,&energy))
+    while (!stopLanczos(lm,diag,offdiag,&energy,0))
     {
         printf(" | Energy per particle : %.7lf",energy/Npar);
         printf("\n------------- IMPLICIT RESTART");
@@ -1217,9 +1231,10 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
             diag[i + 1] = carrDot(nc,lvec[i + 1],HC);
 
             // ASSESS STOP CONDITION BASED ON ENERGY VARIATION -------
+            /*
             if ((i+1) % 10 == 0)
             {
-                if (stopLanczos(i+1,diag,offdiag,&energy))
+                if (stopLanczos(i+1,diag,offdiag,&energy,0))
                 {
                     printf(" | Energy per particle : %.7lf",energy/Npar);
                     free(HC);
@@ -1229,6 +1244,7 @@ int LNCZS_BFMIX(int lm, BFCompoundSpace MixSpace, Carray HoB, Carray HoF,
                 }
                 printf(" | Energy per particle : %.7lf",energy/Npar);
             }
+            */
             // -------------------------------------------------------
 
             for (j = 0; j < nc; j++)

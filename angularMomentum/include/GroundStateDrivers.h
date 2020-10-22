@@ -17,7 +17,7 @@
 
 
 double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, int nc,
-       Iarray * ht, Carray C, Carray Ho, double g)
+       Iarray * ht, Carray C, Carray Ho, double g, int supp)
 {
 
 /** Find the lowest Eigenvalue using Lanczos tridiagonal decomposition
@@ -60,8 +60,11 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, int nc,
     }
 
     H = boseH(Npar,lmax,nc,ht,Ho,g);
-    if (H == NULL) printf("\nWithout set Hamiltonian matrix\n");
-    else           printf("\nUsing (sparse) Hamiltonian matrix\n");
+    if (!supp)
+    {
+        if (H == NULL) printf("\nWithout set Hamiltonian matrix\n");
+        else           printf("\nUsing (sparse) Hamiltonian matrix\n");
+    }
 
     if (nc == 1)
     {
@@ -105,7 +108,7 @@ double GROUND_STATE(int Niter, int Npar, int lmax, int total_mom, int nc,
 
     predictedIter = Niter;
     if (H == NULL) Niter = LNCZS_HACT(Niter,nc,lmax,ht,Ho,g,diag,offdiag,lvec);
-    else           Niter = LNCZS_HMAT(Niter,Npar,nc,H,diag,offdiag,lvec);
+    else           Niter = LNCZS_HMAT(Niter,Npar,nc,H,diag,offdiag,lvec,supp);
 
     // TRANSFER DATA TO USE LAPACK ROUTINE
     for (k = 0; k < Niter; k++)
@@ -234,7 +237,7 @@ double BOSEBOSE_GS(int Niter, CompoundSpace MixSpace, Carray C, Carray HoA,
     }
     else
     {
-        Niter = LNCZS_HMAT(Niter,Npar,nc,H,diag,offdiag,lvec);
+        Niter = LNCZS_HMAT(Niter,Npar,nc,H,diag,offdiag,lvec,0);
     }
 
     // TRANSFER DATA TO USE LAPACK ROUTINE
@@ -362,7 +365,7 @@ double BOSEFERMI_GS(int Niter, BFCompoundSpace MixSpace, Carray C, Carray HoB,
     }
     else
     {
-        Niter = LNCZS_HMAT(Niter,Npar,nc,H,diag,offdiag,lvec);
+        Niter = LNCZS_HMAT(Niter,Npar,nc,H,diag,offdiag,lvec,0);
     }
 
     // TRANSFER DATA TO USE LAPACK ROUTINE
@@ -487,7 +490,7 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
         C = carrDef(nc);
         initGuess(nc,C);
         // call (main)routine to compute the ground state
-        E0 = GROUND_STATE(lan_it,Npar,lmax,total_mom,nc,ht,C,Ho,g);
+        E0 = GROUND_STATE(lan_it,Npar,lmax,total_mom,nc,ht,C,Ho,g,0);
         // compute average occupations in single particle states
         avgocc = rarrDef(2*lmax+1);
         single_avgocc(Npar,lmax,nc,ht,C,avgocc);
@@ -522,19 +525,33 @@ void SCANNING(int n_cases, char prefix [], unsigned int full_output)
 void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
 {
     int
-        i,
-        j,
-        nc,
-        NparA,
-        lmaxA,
-        NparB,
-        lmaxB,
-        lan_it,
-        total_mom,
-        coefMemory;
+        i,  // Enumeration Variables
+        j,  // ******
+        k,  // ******
+        n,  // ******
+        m,  // ******
+        nc, // ******
+        La, // fixed angular momentum for type A (gab = 0 only)
+        Lb, // fixed angular momentum for type B (gab = 0 only)
+        ia, // index of specific config. in subspace for fixed La
+        LaTrial,
+        LbTrial,
+        ncA,    // Number of Config. (size of) space A
+        ncB,    // Number of Config. (size of) space B
+        NparA,  // Number of particles type A
+        lmaxA,  // max. single particle state momentum for type A
+        NparB,  // Number of particles type B
+        lmaxB,  // max. single particle state momentum for type B
+        Ait,    // for Lanczos iterations
+        Bit,    // for Lanczos iterations
+        total_mom,  // total angular momentum fixed for the system
+        coefMemory; // memory required for many-body state coefficients
     double
         l,
         E0,
+        E0A,
+        E0B,
+        Etrial,
         boost,
         MassImbal,
         avgLA,
@@ -544,22 +561,27 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         covAB;
     double
         g[3];
-    Rarray
-        avgoccA,
-        avgoccB;
     char
         strnum[100],
         e_fname[100],
         in_fname[100],
         out_fname[100];
+    Iarray
+        * htA,  // Hashing table type A (only for gab = 0)
+        * htB;  // Hashing table type B (only for gab = 0)
+    Rarray
+        avgoccA,
+        avgoccB;
     Carray
         C,
+        Ca,
+        Cb,
         HoA,
         HoB;
     FILE
         * e_file;
     CompoundSpace
-        MixSpace;
+        S;
 
     // set file name with input data
     strcpy(in_fname,prefix);
@@ -581,24 +603,9 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         // set up parameters of config. space from line 'i' of input file
         mixParLine(in_fname,i,&NparA,&lmaxA,&NparB,&lmaxB,&total_mom,
                    &boost,&MassImbal,g);
-        MixSpace = AllocCompBasis(NparA,NparB,lmaxA,lmaxB,total_mom);
-        nc = MixSpace->size;
-        printf("\n\n\n\n\nCOMPUTING GROUND STATE ");
-        printf("OF BOSONIC MIXTURE %d/%d",i+1,n_cases);
-        sepline();
-        // set up (default)  number of Lanczos iterations
-        // respecting the memory allowed (MEMORY_TOL) and
-        // maximum number of iterations (MAX_LNCZS_IT)
-        coefMemory = nc * sizeof(double complex);
-        if (nc > MAX_LNCZS_IT)
-        {
-            lan_it = 10;
-            while (lan_it*coefMemory < MEMORY_TOL && lan_it < MAX_LNCZS_IT)
-            {
-                lan_it++;
-            }
-        }
-        else lan_it = nc; // Small config. space
+        S = AllocCompBasis(NparA,NparB,lmaxA,lmaxB,total_mom);
+        nc = S->size;    // total number of configurations
+        C = carrDef(nc); // allocate coefficients of Fock state
         // set up one-body matrix elements
         HoA = carrDef(2*lmaxA+1);
         for (j = 0; j < 2*lmaxA+1; j++)
@@ -612,21 +619,120 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
             l = (j-lmaxB) - boost/MassImbal;
             HoB[j] = 0.5*MassImbal*l*l;
         }
-        // initialize many-body state coefficients
-        C = carrDef(nc);
-        initGuess(nc,C);
-        // call routine for the ground state
-        E0 = BOSEBOSE_GS(lan_it,MixSpace,C,HoA,HoB,g);
+        // If the inter-species interaction is zero we can
+        // choose as eigenstate of both angular momentum La/Lb
+        if (fabs(g[2]) == 0)
+        {
+            Etrial = 1E10;
+            printf("\n\n\n\n\nCOMPUTING GROUND STATE ");
+            printf("OF BOSONIC MIXTURE %d/%d (gab = 0)",i+1,n_cases);
+            sepline();
+            printf("\t La       Lb         E/N\n");
+            printf("\t----------------------------");
+            for (La = -(lmaxA-1)*NparA; La <= (lmaxA-1)*NparA; La++)
+            {
+                Lb = total_mom - La;
+                if (Lb < -NparB*(lmaxB-1) || Lb > NparB*(lmaxB-1)) continue;
+                ncA = BFixedMom_mcsize(NparA,lmaxA,La);
+                htA = BAssembleHT(NparA,lmaxA,La,ncA);
+                ncB = BFixedMom_mcsize(NparB,lmaxB,Lb);
+                htB = BAssembleHT(NparB,lmaxB,Lb,ncB);
+                Ca = carrDef(ncA);
+                initGuess(ncA,Ca);
+                Cb = carrDef(ncB);
+                initGuess(ncB,Cb);
+                if (ncA > MAX_LNCZS_IT) Ait = MAX_LNCZS_IT;
+                else Ait = ncA; // Small config. space
+                if (ncB > MAX_LNCZS_IT) Bit = MAX_LNCZS_IT;
+                else Bit = ncB; // Small config. space
+                E0A = GROUND_STATE(Ait,NparA,lmaxA,La,ncA,htA,Ca,HoA,g[0],1);
+                E0B = GROUND_STATE(Bit,NparB,lmaxB,Lb,ncB,htB,Cb,HoB,g[1],1);
+                if (Etrial > E0A+E0B)
+                {
+                    LaTrial = La;
+                    LbTrial = Lb;
+                    Etrial = E0A+E0B;
+                }
+                for (j = 0; j < ncA; j++) free(htA[j]);
+                free(htA);
+                for (j = 0; j < ncB; j++) free(htB[j]);
+                free(htB);
+                free(Ca);
+                free(Cb);
+                printf("\n\t%3d      %3d      ",La,Lb);
+                printf("%.7lf",(E0A+E0B)/(NparA+NparB));
+            }
+            La = LaTrial;
+            Lb = LbTrial;
+            ncA = BFixedMom_mcsize(NparA,lmaxA,La);
+            htA = BAssembleHT(NparA,lmaxA,La,ncA);
+            ncB = BFixedMom_mcsize(NparB,lmaxB,Lb);
+            htB = BAssembleHT(NparB,lmaxB,Lb,ncB);
+            Ca = carrDef(ncA);
+            initGuess(ncA,Ca);
+            Cb = carrDef(ncB);
+            initGuess(ncB,Cb);
+            if (ncA > MAX_LNCZS_IT) Ait = MAX_LNCZS_IT;
+            else Ait = ncA; // Small config. space
+            if (ncB > MAX_LNCZS_IT) Bit = MAX_LNCZS_IT;
+            else Bit = ncB; // Small config. space
+            E0A = GROUND_STATE(Ait,NparA,lmaxA,La,ncA,htA,Ca,HoA,g[0],1);
+            E0B = GROUND_STATE(Bit,NparB,lmaxB,Lb,ncB,htB,Cb,HoB,g[1],1);
+            // transfer data to the compound space coefficients
+            // from the tensor product state computed
+            for (j = 0; j < nc; j++) C[j] = 0.0 + 0.0*I;
+            for (k = 0; k < ncA; k++)
+            {
+                n = BBsubIndex(S,htA[k]);
+                ia = BgetIndex(S->lmaxA,S->sub[n].sizeA,S->sub[n].hta,htA[k]);
+                for (j = 0; j < ncB; j++)
+                {
+                    m = BBgetIndex_B(S,n,ia,htB[j]);
+                    C[m] = Ca[k]*Cb[j];
+                }
+            }
+            assert_norm(nc,C);
+            E0 = E0A + E0B; // compute total energy
+            free(Ca);
+            free(Cb);
+            for (j = 0; j < ncA; j++) free(htA[j]);
+            free(htA);
+            for (j = 0; j < ncB; j++) free(htB[j]);
+            free(htB);
+        }
+        else
+        {
+            printf("\n\n\n\n\nCOMPUTING GROUND STATE ");
+            printf("OF BOSONIC MIXTURE %d/%d",i+1,n_cases);
+            sepline();
+            // set up (default)  number of Lanczos iterations
+            // respecting the memory allowed (MEMORY_TOL) and
+            // maximum number of iterations (MAX_LNCZS_IT)
+            coefMemory = nc * sizeof(double complex);
+            if (nc > MAX_LNCZS_IT)
+            {
+                Ait = 10;
+                while (Ait*coefMemory < MEMORY_TOL && Ait < MAX_LNCZS_IT)
+                {
+                    Ait++;
+                }
+            }
+            else Ait = nc; // Small config. space
+            // initialize many-body state coefficients
+            initGuess(nc,C);
+            // call routine for the ground state
+            E0 = BOSEBOSE_GS(Ait,S,C,HoA,HoB,g);
+        }
         // compute some observables
         avgoccA = rarrDef(2*lmaxA+1);
         avgoccB = rarrDef(2*lmaxB+1);
-        mixture_avgocc(MixSpace,C,'A',avgoccA);
-        mixture_avgocc(MixSpace,C,'B',avgoccB);
-        avgLA = mixture_avgmom(MixSpace,C,'A');
-        avgLB = mixture_avgmom(MixSpace,C,'B');
-        variA = mixture_momvariance(MixSpace,C,'A');
-        variB = mixture_momvariance(MixSpace,C,'B');
-        covAB = mixture_momcov(MixSpace,C);
+        mixture_avgocc(S,C,'A',avgoccA);
+        mixture_avgocc(S,C,'B',avgoccB);
+        avgLA = mixture_avgmom(S,C,'A');
+        avgLB = mixture_avgmom(S,C,'B');
+        variA = mixture_momvariance(S,C,'A');
+        variB = mixture_momvariance(S,C,'B');
+        covAB = mixture_momcov(S,C);
         // WRITE OUTPUT DATA IN A FILE
         fprintf(e_file,"%d %d %d %d %d ",NparA,lmaxA,NparB,lmaxB,total_mom);
         fprintf(e_file,"%.10E %.10E ",boost,MassImbal);
@@ -659,7 +765,7 @@ void MIXTURE_SCANNING(int n_cases, char prefix [], unsigned int full_output)
         free(C);
         free(HoA);
         free(HoB);
-        freeCompSpace(MixSpace);
+        freeCompSpace(S);
     }
 
     fclose(e_file);
